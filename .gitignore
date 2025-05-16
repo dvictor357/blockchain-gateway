@@ -1,0 +1,43 @@
+# Binaries and build outputs
+/bin/
+/build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+blockchain-gateway
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go specific
+/vendor/
+/Godeps/
+
+# Air live reload
+/tmp/
+.air.toml.tmp
+
+# Log files
+*.log
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Debug files
+__debug_bin
