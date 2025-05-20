@@ -15,6 +15,16 @@ import (
 	"github.com/user/blockchain-gateway/pkg/marketdata"
 )
 
+var (
+	allowedOrderBy = map[string]bool{
+		"market_cap_rank": true,
+		"name":            true,
+		"current_price":   true,
+		"last_updated":    true,
+		"data_fetched_at": true,
+	}
+)
+
 // Handler manages API requests
 type Handler struct {
 	clientManager     *blockchain.ClientManager
@@ -312,7 +322,6 @@ func (h *Handler) GetCoinMarkets(c *gin.Context) {
 	}
 
 	// Basic validation for orderBy and sortDirection (more robust validation can be added)
-	allowedOrderBy := map[string]bool{"market_cap_rank": true, "name": true, "current_price": true, "last_updated": true, "data_fetched_at": true}
 	if !allowedOrderBy[strings.ToLower(orderBy)] {
 		orderBy = defaultOrderBy
 	}

@@ -28,11 +28,11 @@ func RateLimit(rateLimit int) gin.HandlerFunc {
 		mutex        sync.Mutex
 	)
 
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
+
+		mutex.Lock()
+		defer mutex.Unlock()
 
 		// Get or initialize the entry for this IP
 		entry, exists := rateLimitMap[ip]
