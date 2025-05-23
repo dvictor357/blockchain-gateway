@@ -12,7 +12,7 @@ GOBASE=$(shell pwd)
 GOBIN=$(GOBASE)/bin
 
 # Commands
-.PHONY: all build clean run test dev install-air
+.PHONY: all build clean run test dev install-air swagger
 
 all: clean build
 
@@ -57,6 +57,19 @@ install-air:
 install-tools: install-air
 	@echo "Installing development tools..."
 
+# Generate Swagger documentation
+swagger:
+	@echo "Generating Swagger documentation..."
+	@if command -v swag > /dev/null; then \
+		swag init -g cmd/server/main.go -o docs; \
+		echo "Swagger documentation generated in docs/"; \
+	else \
+		echo "swag is not installed. Installing..."; \
+		go install github.com/swaggo/swag/cmd/swag@latest; \
+		swag init -g cmd/server/main.go -o docs; \
+		echo "Swagger documentation generated in docs/"; \
+	fi
+
 # Generate Go module files
 mod:
 	@echo "Updating Go modules..."
@@ -86,6 +99,7 @@ help:
 	@echo "make test       - Run tests"
 	@echo "make dev        - Run with Air (live-reload)"
 	@echo "make install-air - Install Air for development"
+	@echo "make swagger    - Generate Swagger documentation"
 	@echo "make mod        - Update Go modules"
 	@echo "make fmt        - Format code"
 	@echo "make lint       - Lint code"

@@ -19,6 +19,18 @@ type Balance struct {
 	Chain      string   `json:"chain"`
 }
 
+// MarshalJSON implements custom JSON marshaling for Balance
+func (b Balance) MarshalJSON() ([]byte, error) {
+	type Alias Balance
+	return json.Marshal(&struct {
+		Balance string `json:"balance"`
+		*Alias
+	}{
+		Balance: b.Balance.String(),
+		Alias:   (*Alias)(&b),
+	})
+}
+
 type BlockInfo struct {
 	Number           uint64 `json:"number"`
 	Hash             string `json:"hash"`
@@ -37,6 +49,23 @@ type TransactionInfo struct {
 	BlockHash   string   `json:"block_hash,omitempty"`
 	Status      string   `json:"status,omitempty"`
 	Chain       string   `json:"chain"`
+}
+
+// MarshalJSON implements custom JSON marshaling for TransactionInfo
+func (t TransactionInfo) MarshalJSON() ([]byte, error) {
+	type Alias TransactionInfo
+	var value *string
+	if t.Value != nil {
+		v := t.Value.String()
+		value = &v
+	}
+	return json.Marshal(&struct {
+		Value *string `json:"value,omitempty"`
+		*Alias
+	}{
+		Value: value,
+		Alias: (*Alias)(&t),
+	})
 }
 
 // GetBalance retrieves an account balance from the specified blockchain

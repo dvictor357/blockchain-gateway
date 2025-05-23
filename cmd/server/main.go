@@ -1,3 +1,30 @@
+// @title           Blockchain Gateway API
+// @version         1.0
+// @description     A high-performance Go API gateway for interacting with multiple blockchain networks through a unified interface.
+// @description
+// @description     This API provides simplified access to various blockchain RPC endpoints through a single, consistent interface.
+// @description     It abstracts away the differences between blockchain implementations, allowing developers to focus on building their applications.
+//
+// @contact.name   API Support
+// @contact.url    https://github.com/dvictor357/blockchain-gateway
+// @contact.email  support@example.com
+//
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+//
+// @host      localhost:8080
+// @BasePath  /
+//
+// @schemes   http https
+//
+// @tag.name health
+// @tag.description Health check operations
+//
+// @tag.name chains
+// @tag.description Blockchain operations and queries
+//
+// @tag.name markets
+// @tag.description Cryptocurrency market data operations
 package main
 
 import (
@@ -10,6 +37,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/dvictor357/blockchain-gateway/docs"
 	"github.com/dvictor357/blockchain-gateway/pkg/api"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
 	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
@@ -18,6 +46,8 @@ import (
 	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
@@ -92,13 +122,15 @@ func main() {
 	router.Use(api.LoggingMiddleware(logger))
 	router.Use(api.RateLimit(appConfig.Server.RateLimit))
 
+	router.GET("/health", healthCheckHandler)
+
+	// Swagger documentation endpoint
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	if gin.Mode() == gin.DebugMode {
 		router.Use(gin.Logger())
 		logger.Println("Running in development mode (debug) with enhanced logging")
-	}
 
-	router.GET("/health", healthCheckHandler)
-	if gin.Mode() == gin.DebugMode {
 		router.GET("/debug/routes", func(c *gin.Context) {
 			routes := []string{}
 			for _, r := range router.Routes() {
@@ -165,9 +197,17 @@ func main() {
 	logger.Println("Server gracefully stopped")
 }
 
+// healthCheckHandler handles health check requests
+// @Summary      Health Check
+// @Description  Check if the API is running and healthy
+// @Tags         health
+// @Accept       json
+// @Produce      json
+// @Success      200  {object}  api.HealthResponse
+// @Router       /health [get]
 func healthCheckHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{
-		"status": "ok",
-		"time":   time.Now().Format(time.RFC3339),
+	c.JSON(http.StatusOK, api.HealthResponse{
+		Status: "ok",
+		Time:   time.Now().Format(time.RFC3339),
 	})
 }

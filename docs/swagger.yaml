@@ -1,0 +1,685 @@
+basePath: /
+definitions:
+  api.ChainsResponse:
+    properties:
+      chains:
+        example:
+        - ethereum
+        - bitcoin
+        - polygon
+        items:
+          type: string
+        type: array
+      count:
+        example: 3
+        type: integer
+    type: object
+  api.GasPriceResponse:
+    properties:
+      chain:
+        example: ethereum
+        type: string
+      gas_price:
+        example: "20000000000"
+        type: string
+      gas_price_hex:
+        example: "0x4a817c800"
+        type: string
+    type: object
+  api.HealthResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+      time:
+        example: "2023-05-15T14:30:45Z"
+        type: string
+    type: object
+  api.MarketDataResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.CoinMarket'
+        type: array
+      meta:
+        $ref: '#/definitions/api.MetaInfo'
+      pagination:
+        $ref: '#/definitions/api.PaginationInfo'
+    type: object
+  api.MetaInfo:
+    properties:
+      last_data_update_from_source:
+        example: "2024-05-28T10:01:05.123456789Z"
+        type: string
+    type: object
+  api.PaginationInfo:
+    properties:
+      current_page:
+        example: 1
+        type: integer
+      limit:
+        example: 20
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+      total_records:
+        example: 100
+        type: integer
+    type: object
+  api.RPCError:
+    properties:
+      code:
+        example: -32000
+        type: integer
+      data:
+        example: Additional error details
+        type: string
+      message:
+        example: Server error
+        type: string
+    type: object
+  api.SwaggerBalance:
+    properties:
+      address:
+        example: 0x742d35Cc6634C0532925a3b844Bc454e4438f44e
+        type: string
+      balance:
+        example: "1000000000000000000"
+        type: string
+      chain:
+        example: ethereum
+        type: string
+      decimals:
+        example: 18
+        type: integer
+      hex_balance:
+        example: "0xde0b6b3a7640000"
+        type: string
+      symbol:
+        example: ETH
+        type: string
+    type: object
+  api.SwaggerBlockInfo:
+    properties:
+      chain:
+        example: ethereum
+        type: string
+      hash:
+        example: 0x8d12a0d346a05cf0dd9e650a5e41baa531a2ef7a287572739ce5c5a36856ec7c
+        type: string
+      number:
+        example: 18934257
+        type: integer
+      parent_hash:
+        example: 0x781d36b32c7cbf06d952baa1d827eb425bacfdf9c9afc30b735959054a3f2fc1
+        type: string
+      timestamp:
+        example: 1716403465
+        type: integer
+      transaction_count:
+        example: 124
+        type: integer
+    type: object
+  api.SwaggerErrorResponse:
+    properties:
+      code:
+        example: VALIDATION_ERROR
+        type: string
+      details:
+        items:
+          $ref: '#/definitions/validation.ValidationError'
+        type: array
+      error:
+        example: Validation failed
+        type: string
+    type: object
+  api.SwaggerRPCRequest:
+    properties:
+      id:
+        example: 1
+        type: integer
+      jsonrpc:
+        example: "2.0"
+        type: string
+      method:
+        example: eth_blockNumber
+        type: string
+      params:
+        example:
+        - '[]'
+        items:
+          type: string
+        type: array
+    type: object
+  api.SwaggerRPCResponse:
+    properties:
+      error:
+        $ref: '#/definitions/api.RPCError'
+      id:
+        example: 1
+        type: integer
+      jsonrpc:
+        example: "2.0"
+        type: string
+      result:
+        example: "0x1234567"
+        type: string
+    type: object
+  api.SwaggerTransactionInfo:
+    properties:
+      block_hash:
+        example: 0x90e1a8e935cfd5970d6789a7afedb1dac09af91a7b8fc7dbe16008116ab19f9c
+        type: string
+      block_number:
+        example: 18934220
+        type: integer
+      chain:
+        example: ethereum
+        type: string
+      from:
+        example: 0x95222290dd7278aa3ddd389cc1e1d165cc4bafe5
+        type: string
+      hash:
+        example: 0x9c46f98547a5bf8e785e0e77472b3ca8fb5cdb9279fbc443637f781a3e9bff71
+        type: string
+      status:
+        example: success
+        type: string
+      to:
+        example: 0xdef1c0ded9bec7f1a1670819833240f027b25eff
+        type: string
+      value:
+        example: "500000000000000000"
+        type: string
+    type: object
+  api.TransactionCountResponse:
+    properties:
+      address:
+        example: 0x742d35Cc6634C0532925a3b844Bc454e4438f44e
+        type: string
+      chain:
+        example: ethereum
+        type: string
+      nonce:
+        example: "0x2a"
+        type: string
+      transaction_count:
+        example: 42
+        type: integer
+    type: object
+  models.CoinMarket:
+    properties:
+      ath:
+        type: number
+      ath_change_percentage:
+        type: number
+      ath_date:
+        type: string
+      atl:
+        type: number
+      atl_change_percentage:
+        type: number
+      atl_date:
+        type: string
+      circulating_supply:
+        type: number
+      current_price:
+        type: number
+      data_fetched_at:
+        type: string
+      fully_diluted_valuation:
+        type: integer
+      high_24h:
+        type: number
+      id:
+        type: string
+      image:
+        type: string
+      last_updated:
+        type: string
+      low_24h:
+        type: number
+      market_cap:
+        type: integer
+      market_cap_change_24h:
+        type: number
+      market_cap_change_percentage_24h:
+        type: number
+      market_cap_rank:
+        type: integer
+      max_supply:
+        type: number
+      name:
+        type: string
+      price_change_24h:
+        type: number
+      price_change_percentage_24h:
+        type: number
+      roi:
+        $ref: '#/definitions/models.RoiData'
+      symbol:
+        type: string
+      total_supply:
+        type: number
+      total_volume:
+        type: number
+    type: object
+  models.RoiData:
+    properties:
+      currency:
+        type: string
+      percentage:
+        type: number
+      times:
+        type: number
+    type: object
+  validation.ValidationError:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+    url: https://github.com/dvictor357/blockchain-gateway
+  description: |-
+    A high-performance Go API gateway for interacting with multiple blockchain networks through a unified interface.
+
+    This API provides simplified access to various blockchain RPC endpoints through a single, consistent interface.
+    It abstracts away the differences between blockchain implementations, allowing developers to focus on building their applications.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Blockchain Gateway API
+  version: "1.0"
+paths:
+  /api/v1/batch:
+    post:
+      consumes:
+      - application/json
+      description: Execute multiple RPC queries across different blockchain networks
+        in a single request
+      parameters:
+      - description: Batch RPC Request
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            items:
+              $ref: '#/definitions/api.SwaggerRPCRequest'
+            type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                $ref: '#/definitions/api.SwaggerRPCResponse'
+              type: array
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Execute Batch RPC Queries
+      tags:
+      - chains
+  /api/v1/chains:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of all blockchain networks supported by this gateway
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ChainsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: List Supported Blockchains
+      tags:
+      - chains
+  /api/v1/chains/{chain}/address/{address}/balance:
+    get:
+      consumes:
+      - application/json
+      description: Get the native token balance for a specific address on a blockchain
+      parameters:
+      - description: Blockchain name
+        enum:
+        - ethereum
+        - bitcoin
+        - polygon
+        in: path
+        name: chain
+        required: true
+        type: string
+      - description: Wallet address
+        in: path
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SwaggerBalance'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Get Account Balance
+      tags:
+      - chains
+  /api/v1/chains/{chain}/address/{address}/nonce:
+    get:
+      consumes:
+      - application/json
+      description: Get the number of transactions for a specific address on a blockchain
+      parameters:
+      - description: Blockchain name
+        enum:
+        - ethereum
+        - bitcoin
+        - polygon
+        in: path
+        name: chain
+        required: true
+        type: string
+      - description: Wallet address
+        in: path
+        name: address
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.TransactionCountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Get Transaction Count
+      tags:
+      - chains
+  /api/v1/chains/{chain}/block/latest:
+    get:
+      consumes:
+      - application/json
+      description: Get information about the latest block on a blockchain
+      parameters:
+      - description: Blockchain name
+        enum:
+        - ethereum
+        - bitcoin
+        - polygon
+        in: path
+        name: chain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SwaggerBlockInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Get Latest Block
+      tags:
+      - chains
+  /api/v1/chains/{chain}/gas-price:
+    get:
+      consumes:
+      - application/json
+      description: Get the current gas price for EVM-compatible blockchains
+      parameters:
+      - description: Blockchain name
+        enum:
+        - ethereum
+        - polygon
+        in: path
+        name: chain
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.GasPriceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Get Gas Price
+      tags:
+      - chains
+  /api/v1/chains/{chain}/query:
+    post:
+      consumes:
+      - application/json
+      description: Execute a JSON-RPC query on a specific blockchain network
+      parameters:
+      - description: Blockchain name
+        enum:
+        - ethereum
+        - bitcoin
+        - polygon
+        in: path
+        name: chain
+        required: true
+        type: string
+      - description: RPC Request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.SwaggerRPCRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SwaggerRPCResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Execute RPC Query
+      tags:
+      - chains
+  /api/v1/chains/{chain}/tx/{hash}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific transaction by its hash
+      parameters:
+      - description: Blockchain name
+        enum:
+        - ethereum
+        - bitcoin
+        - polygon
+        in: path
+        name: chain
+        required: true
+        type: string
+      - description: Transaction hash
+        in: path
+        name: hash
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SwaggerTransactionInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Get Transaction Details
+      tags:
+      - chains
+  /api/v1/markets:
+    get:
+      consumes:
+      - application/json
+      description: Get a list of cryptocurrency markets with pagination and sorting
+      parameters:
+      - description: Number of items per page
+        in: query
+        name: limit
+        required: true
+        type: string
+      - description: Page number
+        in: query
+        name: offset
+        required: true
+        type: string
+      - description: Field to order by
+        enum:
+        - market_cap_rank
+        - price
+        - volume_24h
+        - price_change_percentage_24h
+        in: query
+        name: orderBy
+        required: true
+        type: string
+      - description: Sort direction
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sortDirection
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.MarketDataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+      summary: Get Coin Markets
+      tags:
+      - markets
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Check if the API is running and healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.HealthResponse'
+      summary: Health Check
+      tags:
+      - health
+schemes:
+- http
+- https
+swagger: "2.0"
+tags:
+- description: Health check operations
+  name: health
+- description: Blockchain operations and queries
+  name: chains
+- description: Cryptocurrency market data operations
+  name: markets
