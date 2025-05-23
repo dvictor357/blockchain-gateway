@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+	"github.com/dvictor357/blockchain-gateway/pkg/config"
+	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
+	"github.com/dvictor357/blockchain-gateway/pkg/validation"
 	"github.com/gin-gonic/gin"
-	"github.com/user/blockchain-gateway/pkg/blockchain"
-	"github.com/user/blockchain-gateway/pkg/config"
-	"github.com/user/blockchain-gateway/pkg/marketdata"
-	"github.com/user/blockchain-gateway/pkg/validation"
 )
 
 // Handler manages API requests with improved error handling and validation

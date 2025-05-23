@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/blockchain-gateway/pkg/models"
+	"github.com/dvictor357/blockchain-gateway/pkg/models"
 )
 
 const (

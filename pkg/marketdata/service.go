@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
+	"github.com/dvictor357/blockchain-gateway/pkg/models"
 	"github.com/robfig/cron/v3"
-	"github.com/user/blockchain-gateway/pkg/coingecko"
-	"github.com/user/blockchain-gateway/pkg/models"
 )
 
 // ServiceConfig holds configuration for the MarketDataService

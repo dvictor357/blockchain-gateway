@@ -182,6 +182,7 @@ func (v *Validator) ValidateRPCRequest(method string, params interface{}) Valida
 
 	if method == "" {
 		errors = append(errors, ValidationError{Field: "method", Message: "RPC method is required"})
+		return errors
 	}
 
 	// Basic method name validation

@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+	"github.com/dvictor357/blockchain-gateway/pkg/validation"
 	"github.com/gin-gonic/gin"
-	"github.com/user/blockchain-gateway/pkg/blockchain"
-	"github.com/user/blockchain-gateway/pkg/validation"
 )
 
 // ErrorResponse represents a standardized error response

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/models"
 	_ "github.com/lib/pq"
-	"github.com/user/blockchain-gateway/pkg/models"
 )
 
 // MarketRepository defines the interface for database operations on coin market data.

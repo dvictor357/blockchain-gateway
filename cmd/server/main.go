@@ -10,14 +10,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/api"
+	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
+	"github.com/dvictor357/blockchain-gateway/pkg/config"
+	"github.com/dvictor357/blockchain-gateway/pkg/database"
+	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/user/blockchain-gateway/pkg/api"
-	"github.com/user/blockchain-gateway/pkg/blockchain"
-	"github.com/user/blockchain-gateway/pkg/coingecko"
-	"github.com/user/blockchain-gateway/pkg/config"
-	"github.com/user/blockchain-gateway/pkg/database"
-	"github.com/user/blockchain-gateway/pkg/marketdata"
 )
 
 func main() {
