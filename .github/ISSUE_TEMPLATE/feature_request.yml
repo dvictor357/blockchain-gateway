@@ -1,0 +1,236 @@
+name: ✨ Feature Request
+description: Suggest a new feature or enhancement for the Blockchain Gateway
+title: "[FEATURE] "
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide as much detail as possible to help us understand your request.
+
+  - type: textarea
+    id: feature-summary
+    attributes:
+      label: ✨ Feature Summary
+      description: A brief, clear summary of the feature you'd like to see added.
+      placeholder: Summarize the feature in one or two sentences...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-type
+    attributes:
+      label: 🏗️ Feature Type
+      description: What type of feature is this?
+      options:
+        - New API Endpoint
+        - New Blockchain Support
+        - Performance Improvement
+        - Security Enhancement
+        - Developer Experience
+        - Documentation
+        - Testing
+        - DevOps/Infrastructure
+        - UI/UX Improvement
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 🚨 Priority
+      description: How important is this feature?
+      options:
+        - Critical (Blocking major functionality)
+        - High (Important for user experience)
+        - Medium (Nice to have, improves workflow)
+        - Low (Minor enhancement)
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem-statement
+    attributes:
+      label: 🎯 Problem Statement
+      description: What problem does this feature solve? What pain point are you experiencing?
+      placeholder: |
+        Describe the current situation and why it's problematic...
+
+        Example: "Currently, users have to make multiple API calls to get balance information for multiple addresses, which is inefficient and slow."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: 💡 Proposed Solution
+      description: Describe your proposed solution in detail.
+      placeholder: |
+        Describe how you envision this feature working...
+
+        Include:
+        - How users would interact with it
+        - What the API would look like (if applicable)
+        - Any specific implementation details you have in mind
+    validations:
+      required: true
+
+  - type: textarea
+    id: user-stories
+    attributes:
+      label: 👤 User Stories
+      description: Describe how different users would benefit from this feature.
+      placeholder: |
+        As a [type of user], I want [goal] so that [benefit].
+
+        Example:
+        - As a developer, I want to query multiple addresses in one request so that I can reduce API calls and improve performance.
+        - As a mobile app developer, I want batch endpoints so that I can minimize network requests and save battery life.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: ✅ Acceptance Criteria
+      description: What specific criteria must be met for this feature to be considered complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+
+        Example:
+        - [ ] API endpoint accepts array of addresses
+        - [ ] Response includes balance for each address
+        - [ ] Error handling for invalid addresses
+        - [ ] Rate limiting applies to batch requests
+        - [ ] Documentation is updated
+    validations:
+      required: true
+
+  - type: textarea
+    id: api-design
+    attributes:
+      label: 🔗 API Design (if applicable)
+      description: If this involves API changes, provide the proposed API design.
+      placeholder: |
+        Request:
+        ```json
+        {
+          "addresses": ["0x123...", "0x456..."],
+          "chain": "ethereum"
+        }
+        ```
+
+        Response:
+        ```json
+        {
+          "balances": [
+            {"address": "0x123...", "balance": "1000000000000000000"},
+            {"address": "0x456...", "balance": "2000000000000000000"}
+          ]
+        }
+        ```
+      render: json
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 🔄 Alternative Solutions
+      description: Have you considered any alternative approaches? What are the pros and cons?
+      placeholder: |
+        Alternative 1: [Description]
+        Pros: [List pros]
+        Cons: [List cons]
+
+        Alternative 2: [Description]
+        Pros: [List pros]
+        Cons: [List cons]
+
+  - type: textarea
+    id: technical-considerations
+    attributes:
+      label: ⚙️ Technical Considerations
+      description: Any technical aspects to consider for implementation?
+      placeholder: |
+        - Performance implications
+        - Security considerations
+        - Backward compatibility
+        - Database schema changes
+        - Third-party integrations
+        - Testing requirements
+
+  - type: dropdown
+    id: blockchain-chains
+    attributes:
+      label: ⛓️ Blockchain Chains (if applicable)
+      description: Which blockchain networks should this feature support?
+      multiple: true
+      options:
+        - Ethereum
+        - Bitcoin
+        - Polygon
+        - All EVM-compatible chains
+        - New blockchain (specify in additional context)
+        - Not blockchain-specific
+
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: 🎯 Use Cases
+      description: Provide specific real-world use cases for this feature.
+      placeholder: |
+        1. Use Case 1: [Description of scenario]
+        2. Use Case 2: [Description of scenario]
+        3. Use Case 3: [Description of scenario]
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: 🎨 Mockups/Wireframes
+      description: If applicable, provide mockups, wireframes, or visual examples.
+      placeholder: Drag and drop images here or paste image URLs
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📝 Additional Context
+      description: Any other context, links, or information that would be helpful.
+      placeholder: |
+        - Links to similar features in other projects
+        - Research or documentation
+        - Community feedback
+        - Business justification
+
+  - type: checkboxes
+    id: implementation-willingness
+    attributes:
+      label: 🛠️ Implementation
+      description: Are you willing to help implement this feature?
+      options:
+        - label: I am willing to submit a pull request for this feature
+          required: false
+        - label: I can help with testing this feature
+          required: false
+        - label: I can help with documentation for this feature
+          required: false
+        - label: I need help from maintainers to implement this
+          required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided a clear problem statement and proposed solution
+          required: true
+        - label: I have considered the impact on existing functionality
+          required: true
+        - label: This feature aligns with the project's goals and roadmap
+          required: false

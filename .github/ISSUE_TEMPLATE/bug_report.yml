@@ -1,0 +1,148 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior in the Blockchain Gateway
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below to help us understand and reproduce the issue.
+
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: 🐛 Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe what happened and what you expected to happen...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: 🔄 Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: ✅ Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: ❌ Actual Behavior
+      description: A clear and concise description of what actually happened.
+      placeholder: What actually happened?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 🚨 Severity
+      description: How severe is this bug?
+      options:
+        - Critical (System down, data loss)
+        - High (Major feature broken)
+        - Medium (Feature partially broken)
+        - Low (Minor issue, workaround available)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: 🏗️ Component
+      description: Which component is affected?
+      options:
+        - API Handlers
+        - Blockchain Clients (Ethereum)
+        - Blockchain Clients (Bitcoin)
+        - Blockchain Clients (Polygon)
+        - Database/Repository
+        - Market Data Service
+        - Validation
+        - Configuration
+        - Documentation
+        - CI/CD
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 🌍 Environment
+      description: Information about your environment
+      value: |
+        - OS: [e.g. macOS 12.0, Ubuntu 20.04, Windows 11]
+        - Go Version: [e.g. 1.24.3]
+        - Docker Version: [if applicable]
+        - Browser: [if web-related, e.g. Chrome 96.0]
+        - Deployment: [e.g. local, staging, production]
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 📋 Logs and Error Messages
+      description: Please copy and paste any relevant log output or error messages
+      placeholder: Paste logs here...
+      render: shell
+
+  - type: textarea
+    id: api-request
+    attributes:
+      label: 🔗 API Request (if applicable)
+      description: If this is an API-related bug, please provide the request details
+      placeholder: |
+        Method: GET/POST/etc.
+        URL: /api/v1/...
+        Headers: {...}
+        Body: {...}
+      render: json
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 📸 Screenshots
+      description: If applicable, add screenshots to help explain your problem.
+      placeholder: Drag and drop images here or paste image URLs
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📝 Additional Context
+      description: Add any other context about the problem here.
+      placeholder: Any additional information that might be helpful...
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ Checklist
+      description: Please confirm the following
+      options:
+        - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: I have provided all the requested information above
+          required: true
+        - label: I have tested this on the latest version
+          required: false
+        - label: I am willing to submit a pull request to fix this issue
+          required: false

@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/dvictor357/blockchain-gateway/blob/main/README.md
+    about: Check the documentation for API usage and setup instructions
+  - name: 💬 Discussions
+    url: https://github.com/dvictor357/blockchain-gateway/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 🚀 Project Roadmap
+    url: https://github.com/dvictor357/blockchain-gateway/blob/main/PROJECT_ROADMAP.md
+    about: View the project roadmap and current progress
+  - name: 🔧 Sprint Planning
+    url: https://github.com/dvictor357/blockchain-gateway/blob/main/SPRINT_PLANNING_TEMPLATE.md
+    about: Sprint planning template for development teams

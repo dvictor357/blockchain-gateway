@@ -1,0 +1,173 @@
+name: ❓ Question/Support
+description: Ask a question or request support for the Blockchain Gateway
+title: "[QUESTION] "
+labels: ["question", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your question! Please provide as much detail as possible to help us give you the best answer.
+
+  - type: textarea
+    id: question-summary
+    attributes:
+      label: ❓ Question Summary
+      description: A brief, clear summary of your question.
+      placeholder: What would you like to know?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: question-type
+    attributes:
+      label: 🏗️ Question Type
+      description: What type of question is this?
+      options:
+        - API Usage
+        - Configuration
+        - Integration Help
+        - Best Practices
+        - Troubleshooting
+        - Architecture/Design
+        - Performance
+        - Security
+        - Documentation Clarification
+        - Feature Availability
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: detailed-question
+    attributes:
+      label: 📝 Detailed Question
+      description: Provide a detailed description of your question or the help you need.
+      placeholder: |
+        Please include:
+        - What you're trying to achieve
+        - What you've already tried
+        - Specific areas where you need clarification
+        - Any relevant context about your use case
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-approach
+    attributes:
+      label: 🔄 What Have You Tried?
+      description: Describe what you've already attempted or researched.
+      placeholder: |
+        - Documentation sections you've read
+        - Code you've tried
+        - Solutions you've attempted
+        - Similar issues you've found
+
+  - type: textarea
+    id: code-example
+    attributes:
+      label: 💻 Code Example (if applicable)
+      description: If your question involves code, please provide a minimal example.
+      placeholder: |
+        ```go
+        // Your code here
+        ```
+
+        Or for API requests:
+        ```bash
+        curl -X GET "http://localhost:8080/api/v1/chains/ethereum/address/0x123.../balance"
+        ```
+      render: go
+
+  - type: textarea
+    id: expected-outcome
+    attributes:
+      label: 🎯 Expected Outcome
+      description: What outcome or behavior are you expecting?
+      placeholder: Describe what you expect to happen or what result you're looking for...
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 🌍 Environment
+      description: Information about your environment (if relevant)
+      value: |
+        - OS: [e.g. macOS 12.0, Ubuntu 20.04, Windows 11]
+        - Go Version: [e.g. 1.24.3]
+        - Blockchain Gateway Version: [e.g. latest, v1.0.0]
+        - Deployment: [e.g. local, Docker, production]
+        - Blockchain Networks: [e.g. Ethereum mainnet, testnet]
+      render: markdown
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: ⏰ Urgency
+      description: How urgent is this question?
+      options:
+        - Low (General inquiry, no rush)
+        - Medium (Would like an answer soon)
+        - High (Blocking my work)
+        - Critical (Production issue)
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 🎯 Use Case
+      description: Describe your specific use case or what you're building.
+      placeholder: |
+        Help us understand your context:
+        - What type of application are you building?
+        - How are you planning to use the Blockchain Gateway?
+        - What's your target audience or scale?
+
+  - type: textarea
+    id: error-messages
+    attributes:
+      label: 🚨 Error Messages (if any)
+      description: If you're encountering errors, please provide the full error messages.
+      placeholder: Paste any error messages, logs, or stack traces here...
+      render: shell
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📝 Additional Context
+      description: Any other context that might be helpful.
+      placeholder: |
+        - Links to relevant documentation
+        - Screenshots (if applicable)
+        - Related GitHub issues
+        - Community discussions
+        - Any other relevant information
+
+  - type: checkboxes
+    id: research-checklist
+    attributes:
+      label: ✅ Research Checklist
+      description: Please confirm you've done the following before asking
+      options:
+        - label: I have searched existing issues for similar questions
+          required: true
+        - label: I have read the relevant documentation
+          required: true
+        - label: I have tried to solve this myself
+          required: false
+        - label: I have provided enough context for others to understand my question
+          required: true
+
+  - type: checkboxes
+    id: contribution-willingness
+    attributes:
+      label: 🤝 Contribution
+      description: Would you be willing to help improve the project based on this question?
+      options:
+        - label: I would be willing to contribute documentation improvements based on the answer
+          required: false
+        - label: I would be willing to help others with similar questions in the future
+          required: false
+        - label: I would be interested in contributing code if this reveals a missing feature
+          required: false

@@ -1,0 +1,240 @@
+name: 🔧 Task/Technical Work
+description: Create a task for technical work, refactoring, or maintenance
+title: "[TASK] "
+labels: ["task", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for technical tasks, refactoring work, maintenance, or other development activities that aren't bugs or new features.
+
+  - type: textarea
+    id: task-summary
+    attributes:
+      label: 🔧 Task Summary
+      description: A brief, clear summary of the task to be completed.
+      placeholder: Summarize what needs to be done...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: task-type
+    attributes:
+      label: 🏗️ Task Type
+      description: What type of task is this?
+      options:
+        - Code Refactoring
+        - Technical Debt
+        - Performance Optimization
+        - Security Update
+        - Dependency Update
+        - Documentation
+        - Testing
+        - CI/CD Improvement
+        - Database Migration
+        - Configuration Change
+        - Code Cleanup
+        - Architecture Improvement
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 🚨 Priority
+      description: How urgent is this task?
+      options:
+        - Critical (Blocking other work)
+        - High (Should be done soon)
+        - Medium (Normal priority)
+        - Low (Can be done when time permits)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: 🏗️ Component
+      description: Which component does this task affect?
+      options:
+        - API Handlers
+        - Blockchain Clients (Ethereum)
+        - Blockchain Clients (Bitcoin)
+        - Blockchain Clients (Polygon)
+        - Database/Repository
+        - Market Data Service
+        - Validation
+        - Configuration
+        - Documentation
+        - CI/CD
+        - Testing Infrastructure
+        - Build System
+        - Multiple Components
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: 📋 Background/Context
+      description: Provide context about why this task is needed.
+      placeholder: |
+        Explain:
+        - Why this task is necessary
+        - What problem it solves
+        - Any relevant background information
+        - Links to related issues or discussions
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 🎯 Scope of Work
+      description: Detailed description of what needs to be done.
+      placeholder: |
+        Describe the specific work to be completed:
+        - Files to be modified
+        - Functions/methods to be refactored
+        - Tests to be written
+        - Documentation to be updated
+        - Any other specific tasks
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: ✅ Acceptance Criteria
+      description: What specific criteria must be met for this task to be considered complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+
+        Example:
+        - [ ] Code is refactored according to new pattern
+        - [ ] All existing tests continue to pass
+        - [ ] New tests are added for refactored code
+        - [ ] Code coverage remains above 80%
+        - [ ] Documentation is updated
+        - [ ] Performance benchmarks show improvement
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-details
+    attributes:
+      label: ⚙️ Technical Details
+      description: Any specific technical requirements or implementation details.
+      placeholder: |
+        Include:
+        - Specific technologies or libraries to use
+        - Performance requirements
+        - Compatibility considerations
+        - Code style guidelines
+        - Architecture patterns to follow
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 🔗 Dependencies
+      description: List any dependencies or blockers for this task.
+      placeholder: |
+        - Depends on completion of issue #123
+        - Requires approval from team lead
+        - Needs database migration to be completed first
+        - Blocked by external library update
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: ⚠️ Risks and Considerations
+      description: Any risks or important considerations for this task.
+      placeholder: |
+        - Potential breaking changes
+        - Performance impact
+        - Security implications
+        - Backward compatibility concerns
+        - Testing challenges
+
+  - type: dropdown
+    id: estimated-effort
+    attributes:
+      label: ⏱️ Estimated Effort
+      description: How much effort do you estimate this task will require?
+      options:
+        - XS (< 1 day)
+        - S (1-2 days)
+        - M (3-5 days)
+        - L (1-2 weeks)
+        - XL (> 2 weeks)
+        - Unknown (needs investigation)
+    validations:
+      required: true
+
+  - type: textarea
+    id: testing-strategy
+    attributes:
+      label: 🧪 Testing Strategy
+      description: How should this task be tested?
+      placeholder: |
+        - Unit tests to be added/modified
+        - Integration tests required
+        - Manual testing steps
+        - Performance testing needed
+        - Security testing considerations
+
+  - type: textarea
+    id: rollback-plan
+    attributes:
+      label: 🔄 Rollback Plan
+      description: If applicable, describe how to rollback this change if issues arise.
+      placeholder: |
+        - Steps to revert changes
+        - Database rollback procedures
+        - Configuration changes to undo
+        - Monitoring to watch after deployment
+
+  - type: textarea
+    id: related-issues
+    attributes:
+      label: 🔗 Related Issues
+      description: Link to any related issues, PRs, or discussions.
+      placeholder: |
+        - Closes #123
+        - Related to #456
+        - Follows up on #789
+        - Part of epic #101
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: 📝 Additional Context
+      description: Any other relevant information.
+      placeholder: |
+        - Links to documentation
+        - Research findings
+        - Team discussions
+        - External references
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: ✅ Pre-work Checklist
+      description: Please confirm the following before starting work
+      options:
+        - label: I have reviewed the existing codebase in the affected areas
+          required: false
+        - label: I have considered the impact on other components
+          required: false
+        - label: I have identified all necessary tests to be updated
+          required: false
+        - label: I have a clear understanding of the acceptance criteria
+          required: true
+        - label: I am ready to start work on this task
+          required: false
