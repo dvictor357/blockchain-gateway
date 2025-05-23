@@ -2,42 +2,38 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/user/blockchain-gateway/pkg/blockchain"
+	"github.com/user/blockchain-gateway/pkg/config"
 	"github.com/user/blockchain-gateway/pkg/marketdata"
+	"github.com/user/blockchain-gateway/pkg/validation"
 )
 
-var (
-	allowedOrderBy = map[string]bool{
-		"market_cap_rank": true,
-		"name":            true,
-		"current_price":   true,
-		"last_updated":    true,
-		"data_fetched_at": true,
-	}
-)
-
-// Handler manages API requests
+// Handler manages API requests with improved error handling and validation
 type Handler struct {
 	clientManager     *blockchain.ClientManager
 	logger            *log.Logger
 	marketDataService *marketdata.Service
+	validator         *validation.Validator
+	errorHandler      *ErrorHandler
+	apiConfig         *config.APIConfig
 }
 
-// NewHandler creates a new API handler
+// NewHandler creates a new API handler with all dependencies
 func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
 	return &Handler{
 		clientManager:     clientManager,
 		logger:            logger,
 		marketDataService: marketService,
+		validator:         validation.NewValidator(),
+		errorHandler:      NewErrorHandler(logger),
+		apiConfig:         config.NewAPIConfig(),
 	}
 }
 
@@ -51,38 +47,37 @@ func (h *Handler) ListChains(c *gin.Context) {
 	})
 }
 
-// QueryChain handles RPC queries to a specific blockchain
+// QueryChain handles RPC queries to a specific blockchain with improved validation
 func (h *Handler) QueryChain(c *gin.Context) {
-	// Extract chain name from URL parameters
 	chain := c.Param("chain")
+
+	// Validate chain name
+	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
+		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+		return
+	}
 
 	// Parse the request body
 	var request blockchain.RPCRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		h.errorHandler.HandleBindingError(c, err)
+		return
+	}
+
+	// Validate RPC request
+	if validationErrors := h.validator.ValidateRPCRequest(request.Method, request.Params); validationErrors.HasErrors() {
+		h.errorHandler.HandleValidationErrors(c, validationErrors)
 		return
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
 	// Execute the RPC request
 	result, err := h.clientManager.Execute(ctx, chain, request.Method, request.Params)
 	if err != nil {
-		// Handle specific errors
-		switch err {
-		case blockchain.ErrChainNotSupported:
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Blockchain '%s' not supported", chain)})
-		case blockchain.ErrInvalidRequest:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid RPC request"})
-		case blockchain.ErrRPCTimeout:
-			c.JSON(http.StatusGatewayTimeout, gin.H{"error": "RPC request timed out"})
-		default:
-			// Log the detailed error but return a generic message to the client
-			h.logger.Printf("Error executing RPC request for %s: %v", chain, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute RPC request"})
-		}
+		h.errorHandler.HandleBlockchainError(c, err, "execute RPC request", chain)
 		return
 	}
 
@@ -96,156 +91,149 @@ func (h *Handler) QueryChain(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// BatchQuery handles batch RPC requests, potentially across multiple blockchains
+// BatchQuery handles batch RPC requests with improved validation
 func (h *Handler) BatchQuery(c *gin.Context) {
 	// Parse the request body
 	var batchRequest map[string][]blockchain.RPCRequest
 	if err := c.ShouldBindJSON(&batchRequest); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid batch request format"})
+		h.errorHandler.HandleBindingError(c, err)
 		return
 	}
 
 	// Validate the request
 	if len(batchRequest) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Batch request must include at least one blockchain"})
+		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "EMPTY_BATCH",
+			"Batch request must include at least one blockchain")
 		return
 	}
 
+	if len(batchRequest) > h.apiConfig.MaxBatchSize {
+		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "BATCH_TOO_LARGE",
+			"Batch size cannot exceed %d blockchains", h.apiConfig.MaxBatchSize)
+		return
+	}
+
+	// Validate each chain and request
+	for chain, requests := range batchRequest {
+		if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
+			h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+			return
+		}
+
+		for _, req := range requests {
+			if validationErrors := h.validator.ValidateRPCRequest(req.Method, req.Params); validationErrors.HasErrors() {
+				h.errorHandler.HandleValidationErrors(c, validationErrors)
+				return
+			}
+		}
+	}
+
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("batch"))
 	defer cancel()
 
 	// Execute batch request
 	results, err := h.clientManager.BatchExecute(ctx, batchRequest)
 	if err != nil {
-		h.logger.Printf("Error executing batch request: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute batch request"})
+		h.errorHandler.HandleGenericError(c, err, "execute batch request")
 		return
 	}
 
 	c.JSON(http.StatusOK, results)
 }
 
-// GetBalance retrieves the balance for an address on the specified blockchain
+// GetBalance retrieves the balance for an address with improved validation
 func (h *Handler) GetBalance(c *gin.Context) {
 	chain := c.Param("chain")
 	address := c.Param("address")
 
-	// Validate parameters
-	if chain == "" || address == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Chain and address are required"})
+	// Validate chain and address together
+	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
+		h.errorHandler.HandleValidationErrors(c, validationErrors)
 		return
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
 	// Get balance
 	balance, err := h.clientManager.GetBalance(ctx, chain, address)
 	if err != nil {
-		switch {
-		case errors.Is(err, blockchain.ErrChainNotSupported):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Blockchain '%s' not supported", chain)})
-		default:
-			h.logger.Printf("Error getting balance for %s on %s: %v", address, chain, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get balance: %v", err)})
-		}
+		h.errorHandler.HandleBlockchainError(c, err, "get balance", chain)
 		return
 	}
 
 	c.JSON(http.StatusOK, balance)
 }
 
-// GetLatestBlock retrieves the latest block information from the specified blockchain
+// GetLatestBlock retrieves the latest block information with improved validation
 func (h *Handler) GetLatestBlock(c *gin.Context) {
 	chain := c.Param("chain")
 
-	// Validate parameters
-	if chain == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Chain is required"})
+	// Validate chain name
+	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
+		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 		return
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
 	// Get latest block
 	block, err := h.clientManager.GetLatestBlock(ctx, chain)
 	if err != nil {
-		switch {
-		case errors.Is(err, blockchain.ErrChainNotSupported):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Blockchain '%s' not supported", chain)})
-		default:
-			h.logger.Printf("Error getting latest block for %s: %v", chain, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get latest block: %v", err)})
-		}
+		h.errorHandler.HandleBlockchainError(c, err, "get latest block", chain)
 		return
 	}
 
 	c.JSON(http.StatusOK, block)
 }
 
-// GetTransaction retrieves transaction details for the specified transaction hash
+// GetTransaction retrieves transaction details with improved validation
 func (h *Handler) GetTransaction(c *gin.Context) {
 	chain := c.Param("chain")
 	hash := c.Param("hash")
 
-	// Validate parameters
-	if chain == "" || hash == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Chain and transaction hash are required"})
+	// Validate chain and hash together
+	if validationErrors := h.validator.ValidateChainAndHash(chain, hash); validationErrors.HasErrors() {
+		h.errorHandler.HandleValidationErrors(c, validationErrors)
 		return
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
 	// Get transaction
 	tx, err := h.clientManager.GetTransaction(ctx, chain, hash)
 	if err != nil {
-		switch {
-		case errors.Is(err, blockchain.ErrChainNotSupported):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Blockchain '%s' not supported", chain)})
-		case strings.Contains(err.Error(), "not found"):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Transaction not found: %s", hash)})
-		default:
-			h.logger.Printf("Error getting transaction %s on %s: %v", hash, chain, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get transaction: %v", err)})
-		}
+		h.errorHandler.HandleBlockchainError(c, err, "get transaction", chain)
 		return
 	}
 
 	c.JSON(http.StatusOK, tx)
 }
 
-// GetGasPrice retrieves the current gas price for EVM-compatible chains
+// GetGasPrice retrieves the current gas price with improved validation
 func (h *Handler) GetGasPrice(c *gin.Context) {
 	chain := c.Param("chain")
 
-	// Validate parameters
-	if chain == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Chain is required"})
+	// Validate chain name
+	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
+		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 		return
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
 	// Get gas price
 	gasPrice, err := h.clientManager.GetGasPrice(ctx, chain)
 	if err != nil {
-		switch {
-		case errors.Is(err, blockchain.ErrChainNotSupported):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Blockchain '%s' not supported", chain)})
-		case strings.Contains(err.Error(), "not applicable"):
-			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Gas price not applicable for blockchain: %s", chain)})
-		default:
-			h.logger.Printf("Error getting gas price for %s: %v", chain, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get gas price: %v", err)})
-		}
+		h.errorHandler.HandleBlockchainError(c, err, "get gas price", chain)
 		return
 	}
 
@@ -257,31 +245,25 @@ func (h *Handler) GetGasPrice(c *gin.Context) {
 	})
 }
 
-// GetTransactionCount retrieves the number of transactions sent from an address
+// GetTransactionCount retrieves the transaction count with improved validation
 func (h *Handler) GetTransactionCount(c *gin.Context) {
 	chain := c.Param("chain")
 	address := c.Param("address")
 
-	// Validate parameters
-	if chain == "" || address == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Chain and address are required"})
+	// Validate chain and address together
+	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
+		h.errorHandler.HandleValidationErrors(c, validationErrors)
 		return
 	}
 
 	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
 	// Get transaction count
 	count, err := h.clientManager.GetTransactionCount(ctx, chain, address)
 	if err != nil {
-		switch {
-		case errors.Is(err, blockchain.ErrChainNotSupported):
-			c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Blockchain '%s' not supported", chain)})
-		default:
-			h.logger.Printf("Error getting transaction count for %s on %s: %v", address, chain, err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get transaction count: %v", err)})
-		}
+		h.errorHandler.HandleBlockchainError(c, err, "get transaction count", chain)
 		return
 	}
 
@@ -294,45 +276,53 @@ func (h *Handler) GetTransactionCount(c *gin.Context) {
 	})
 }
 
-// GetCoinMarkets handles requests for coin market data
+// GetCoinMarkets handles requests for coin market data with improved validation
 func (h *Handler) GetCoinMarkets(c *gin.Context) {
-	// Default pagination and sorting parameters
-	defaultLimit := 20
-	defaultOffset := 0
-	defaultOrderBy := "market_cap_rank"
-	defaultSortDirection := "asc"
-
-	limitStr := c.DefaultQuery("limit", strconv.Itoa(defaultLimit))
-	offsetStr := c.DefaultQuery("offset", strconv.Itoa(defaultOffset))
-	orderBy := c.DefaultQuery("orderBy", defaultOrderBy)
-	sortDirection := c.DefaultQuery("sortDirection", defaultSortDirection)
+	// Parse and validate pagination parameters
+	limitStr := c.DefaultQuery("limit", strconv.Itoa(h.apiConfig.DefaultPageLimit))
+	offsetStr := c.DefaultQuery("offset", "0")
+	orderBy := c.DefaultQuery("orderBy", "market_cap_rank")
+	sortDirection := c.DefaultQuery("sortDirection", "asc")
 
 	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit <= 0 {
-		limit = defaultLimit
-	}
-	// Max limit to prevent abuse
-	if limit > 100 {
-		limit = 100
+	if err != nil {
+		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_LIMIT",
+			"Invalid limit parameter")
+		return
 	}
 
 	offset, err := strconv.Atoi(offsetStr)
-	if err != nil || offset < 0 {
-		offset = defaultOffset
+	if err != nil {
+		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_OFFSET",
+			"Invalid offset parameter")
+		return
 	}
 
-	// Basic validation for orderBy and sortDirection (more robust validation can be added)
-	if !allowedOrderBy[strings.ToLower(orderBy)] {
-		orderBy = defaultOrderBy
-	}
-	if strings.ToLower(sortDirection) != "asc" && strings.ToLower(sortDirection) != "desc" {
-		sortDirection = defaultSortDirection
+	// Validate pagination parameters
+	if validationErrors := h.validator.ValidatePaginationParams(limit, offset); validationErrors.HasErrors() {
+		h.errorHandler.HandleValidationErrors(c, validationErrors)
+		return
 	}
 
+	// Validate and normalize limit
+	limit = h.apiConfig.ValidatePageLimit(limit)
+
+	// Validate orderBy field
+	if validationErr := h.validator.ValidateOrderBy(orderBy, h.apiConfig.AllowedOrderByFields); validationErr.Message != "" {
+		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+		return
+	}
+
+	// Validate sort direction
+	if validationErr := h.validator.ValidateSortDirection(sortDirection); validationErr.Message != "" {
+		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+		return
+	}
+
+	// Fetch market data
 	markets, total, latestFetchTime, err := h.marketDataService.GetMarketDataFromDB(c.Request.Context(), limit, offset, orderBy, sortDirection)
 	if err != nil {
-		h.logger.Printf("Error fetching market data from service: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve market data"})
+		h.errorHandler.HandleGenericError(c, err, "retrieve market data")
 		return
 	}
 
