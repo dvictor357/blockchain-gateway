@@ -1,18 +1,16 @@
 package blockchain
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync/atomic"
 )
 
-// EVMClient is a base client for EVM-compatible blockchains
+// EVMClient represents a generic EVM-compatible blockchain client
 type EVMClient struct {
 	name       string
 	rpcURL     string
@@ -20,10 +18,10 @@ type EVMClient struct {
 	requestID  uint64
 }
 
-// NewEVMClient creates a new EVM client
+// NewEVMClient creates a new EVM client instance
 func NewEVMClient(name, rpcURL string, httpClient *http.Client) *EVMClient {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{}
 	}
 
 	return &EVMClient{
@@ -34,67 +32,69 @@ func NewEVMClient(name, rpcURL string, httpClient *http.Client) *EVMClient {
 	}
 }
 
+// NewGenericEVMClient creates a new EVM client for any EVM-compatible chain
+func NewGenericEVMClient(chainName, rpcURL string, httpClient *http.Client) *EVMClient {
+	return NewEVMClient(chainName, rpcURL, httpClient)
+}
+
 // Name returns the name of the blockchain
 func (c *EVMClient) Name() string {
 	return c.name
 }
 
-// Execute executes an EVM JSON-RPC method
+// Execute executes an RPC method on the EVM blockchain
 func (c *EVMClient) Execute(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
-	// Generate a unique request ID
+	// Generate unique request ID
 	id := atomic.AddUint64(&c.requestID, 1)
 
-	// Create the JSON-RPC request
-	request := RPCRequest{
-		JSONRPC: "2.0",
-		Method:  method,
-		Params:  params,
-		ID:      id,
+	// Create JSON-RPC request
+	request := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  method,
+		"params":  params,
+		"id":      id,
 	}
 
-	// Marshal the request body
+	// Marshal request
 	requestBody, err := json.Marshal(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(ctx, "POST", c.rpcURL, bytes.NewReader(requestBody))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.rpcURL, strings.NewReader(string(requestBody)))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
 	}
 
-	// Set headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
 
-	// Execute the request
-	resp, err := c.httpClient.Do(req)
+	// Execute HTTP request
+	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+	// Parse response
+	var rpcResponse struct {
+		JSONRPC string          `json:"jsonrpc"`
+		Result  json.RawMessage `json:"result"`
+		Error   *struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+			Data    string `json:"data,omitempty"`
+		} `json:"error"`
+		ID uint64 `json:"id"`
 	}
 
-	// Check for HTTP error
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(respBody))
-	}
-
-	// Parse the response
-	var rpcResponse RPCResponse
-	if err := json.Unmarshal(respBody, &rpcResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResponse); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	// Check for RPC error
 	if rpcResponse.Error != nil {
-		return nil, fmt.Errorf("RPC error: %d - %s", rpcResponse.Error.Code, rpcResponse.Error.Message)
+		return nil, fmt.Errorf("RPC error %d: %s", rpcResponse.Error.Code, rpcResponse.Error.Message)
 	}
 
 	return rpcResponse.Result, nil
@@ -107,13 +107,12 @@ func (c *EVMClient) GetLatestBlockNumber(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	var hexBlock string
-	if err := json.Unmarshal(result, &hexBlock); err != nil {
+	var blockNumberHex string
+	if err := json.Unmarshal(result, &blockNumberHex); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
 	}
 
-	// Convert hex string to uint64
-	blockNumber, err := parseHexToUint64(hexBlock)
+	blockNumber, err := parseHexToUint64(blockNumberHex)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse block number: %w", err)
 	}
@@ -121,13 +120,10 @@ func (c *EVMClient) GetLatestBlockNumber(ctx context.Context) (uint64, error) {
 	return blockNumber, nil
 }
 
-// GetBalance returns the balance of the specified address
+// GetBalance returns the balance of an address at a specific block
 func (c *EVMClient) GetBalance(ctx context.Context, address string, blockNumber string) (string, error) {
-	if blockNumber == "" {
-		blockNumber = "latest"
-	}
-
-	result, err := c.Execute(ctx, "eth_getBalance", []interface{}{address, blockNumber})
+	params := []interface{}{address, blockNumber}
+	result, err := c.Execute(ctx, "eth_getBalance", params)
 	if err != nil {
 		return "", err
 	}
@@ -140,24 +136,20 @@ func (c *EVMClient) GetBalance(ctx context.Context, address string, blockNumber 
 	return balance, nil
 }
 
-// GetTransactionCount returns the transaction count for the specified address
+// GetTransactionCount returns the transaction count (nonce) for an address
 func (c *EVMClient) GetTransactionCount(ctx context.Context, address string, blockNumber string) (uint64, error) {
-	if blockNumber == "" {
-		blockNumber = "latest"
-	}
-
-	result, err := c.Execute(ctx, "eth_getTransactionCount", []interface{}{address, blockNumber})
+	params := []interface{}{address, blockNumber}
+	result, err := c.Execute(ctx, "eth_getTransactionCount", params)
 	if err != nil {
 		return 0, err
 	}
 
-	var hexCount string
-	if err := json.Unmarshal(result, &hexCount); err != nil {
+	var countHex string
+	if err := json.Unmarshal(result, &countHex); err != nil {
 		return 0, fmt.Errorf("failed to unmarshal transaction count: %w", err)
 	}
 
-	// Convert hex string to uint64
-	count, err := parseHexToUint64(hexCount)
+	count, err := parseHexToUint64(countHex)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse transaction count: %w", err)
 	}
@@ -165,14 +157,10 @@ func (c *EVMClient) GetTransactionCount(ctx context.Context, address string, blo
 	return count, nil
 }
 
-// SendRawTransaction sends a signed transaction to the network
+// SendRawTransaction broadcasts a signed transaction
 func (c *EVMClient) SendRawTransaction(ctx context.Context, signedTxData string) (string, error) {
-	// Ensure the transaction data is properly prefixed with "0x"
-	if len(signedTxData) >= 2 && signedTxData[:2] != "0x" {
-		signedTxData = "0x" + signedTxData
-	}
-
-	result, err := c.Execute(ctx, "eth_sendRawTransaction", []interface{}{signedTxData})
+	params := []interface{}{signedTxData}
+	result, err := c.Execute(ctx, "eth_sendRawTransaction", params)
 	if err != nil {
 		return "", err
 	}
@@ -185,16 +173,12 @@ func (c *EVMClient) SendRawTransaction(ctx context.Context, signedTxData string)
 	return txHash, nil
 }
 
-// parseHexToUint64 safely converts a hex string to uint64
+// parseHexToUint64 converts a hex string to uint64
 func parseHexToUint64(hexStr string) (uint64, error) {
 	// Remove 0x prefix if present
-	hexStr = strings.TrimPrefix(hexStr, "0x")
-
-	// Parse as hex
-	value, err := strconv.ParseUint(hexStr, 16, 64)
-	if err != nil {
-		return 0, fmt.Errorf("invalid hex string: %s", hexStr)
+	if strings.HasPrefix(hexStr, "0x") {
+		hexStr = strings.TrimPrefix(hexStr, "0x")
 	}
 
-	return value, nil
+	return strconv.ParseUint(hexStr, 16, 64)
 }

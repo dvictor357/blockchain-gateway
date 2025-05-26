@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+
+	"github.com/dvictor357/blockchain-gateway/pkg/config"
 )
 
 type ChainType string
@@ -27,16 +29,7 @@ type ChainInfo struct {
 
 var (
 	chainRegistry = map[string]ChainInfo{
-		"ethereum": {
-			Name:        "ethereum",
-			DisplayName: "Ethereum",
-			NativeToken: "ETH",
-			Decimals:    18,
-			ChainID:     1,
-			Type:        ChainTypeEVM,
-			DefaultRPC:  "https://ethereum.publicnode.com",
-			Explorer:    "https://etherscan.io",
-		},
+		// Bitcoin is still hardcoded as it's not EVM
 		"bitcoin": {
 			Name:        "bitcoin",
 			DisplayName: "Bitcoin",
@@ -47,20 +40,46 @@ var (
 			DefaultRPC:  "https://btc.getblock.io/mainnet",
 			Explorer:    "https://www.blockchain.com/explorer",
 		},
-		"polygon": {
-			Name:        "polygon",
-			DisplayName: "Polygon",
-			NativeToken: "POL",
-			Decimals:    18,
-			ChainID:     137,
-			Type:        ChainTypeEVM,
-			DefaultRPC:  "https://polygon-bor-rpc.publicnode.com",
-			Explorer:    "https://polygonscan.com",
-		},
 	}
 
 	registryMutex sync.RWMutex
 )
+
+// LoadChainsFromConfig loads blockchain configurations and registers them
+func LoadChainsFromConfig(chainsConfig config.ChainsConfig) error {
+	registryMutex.Lock()
+	defer registryMutex.Unlock()
+
+	// Load EVM chains from configuration
+	for _, chainConfig := range chainsConfig.EVMChains {
+		if !chainConfig.Enabled {
+			continue // Skip disabled chains
+		}
+
+		chainType := ChainTypeEVM
+		if chainConfig.Type == "bitcoin" {
+			chainType = ChainTypeBitcoin
+		} else if chainConfig.Type == "other" {
+			chainType = ChainTypeOther
+		}
+
+		chainInfo := ChainInfo{
+			Name:        strings.ToLower(chainConfig.Name),
+			DisplayName: chainConfig.DisplayName,
+			NativeToken: chainConfig.NativeToken,
+			Decimals:    chainConfig.Decimals,
+			ChainID:     chainConfig.ChainID,
+			Type:        chainType,
+			DefaultRPC:  chainConfig.RPCURL,
+			Explorer:    chainConfig.Explorer,
+		}
+
+		// Register the chain (overwrite if exists)
+		chainRegistry[chainInfo.Name] = chainInfo
+	}
+
+	return nil
+}
 
 // GetChainInfo returns metadata for the specified blockchain
 func GetChainInfo(chain string) (ChainInfo, error) {
@@ -93,6 +112,20 @@ func ListSupportedChains() []string {
 	chains := make([]string, 0, len(chainRegistry))
 	for chain := range chainRegistry {
 		chains = append(chains, chain)
+	}
+	return chains
+}
+
+// ListEVMChains returns a list of all supported EVM blockchain names
+func ListEVMChains() []string {
+	registryMutex.RLock()
+	defer registryMutex.RUnlock()
+
+	chains := make([]string, 0)
+	for chain, info := range chainRegistry {
+		if info.Type == ChainTypeEVM {
+			chains = append(chains, chain)
+		}
 	}
 	return chains
 }

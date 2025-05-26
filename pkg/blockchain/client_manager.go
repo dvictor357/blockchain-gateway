@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/dvictor357/blockchain-gateway/pkg/config"
 )
 
 // Common errors
@@ -54,8 +56,36 @@ type RPCError struct {
 	Data    string `json:"data,omitempty"`
 }
 
-// NewClientManager creates a new client manager
-func NewClientManager() (*ClientManager, error) {
+// NewClientManager creates a new client manager with configuration
+func NewClientManager(appConfig *config.AppConfig) (*ClientManager, error) {
+	manager := &ClientManager{
+		clients: make(map[string]Client),
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+
+	// Load chains from configuration first
+	if err := LoadChainsFromConfig(appConfig.Chains); err != nil {
+		return nil, fmt.Errorf("failed to load chains from config: %w", err)
+	}
+
+	// Register clients for all configured chains
+	if err := manager.registerClientsFromConfig(appConfig.Chains); err != nil {
+		return nil, fmt.Errorf("failed to register clients from config: %w", err)
+	}
+
+	// Register Bitcoin client (still hardcoded)
+	if err := manager.registerBitcoinClient(); err != nil {
+		return nil, fmt.Errorf("failed to register Bitcoin client: %w", err)
+	}
+
+	return manager, nil
+}
+
+// NewClientManagerLegacy creates a new client manager with legacy hardcoded clients
+// This is kept for backward compatibility
+func NewClientManagerLegacy() (*ClientManager, error) {
 	manager := &ClientManager{
 		clients: make(map[string]Client),
 		httpClient: &http.Client{
@@ -71,9 +101,37 @@ func NewClientManager() (*ClientManager, error) {
 	return manager, nil
 }
 
+// registerClientsFromConfig registers blockchain clients based on configuration
+func (cm *ClientManager) registerClientsFromConfig(chainsConfig config.ChainsConfig) error {
+	for _, chainConfig := range chainsConfig.EVMChains {
+		if !chainConfig.Enabled {
+			continue
+		}
+
+		client := NewGenericEVMClient(chainConfig.Name, chainConfig.RPCURL, cm.httpClient)
+
+		if err := cm.RegisterClient(client); err != nil {
+			return fmt.Errorf("failed to register client for %s: %w", chainConfig.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// registerBitcoinClient registers the Bitcoin client
+func (cm *ClientManager) registerBitcoinClient() error {
+	chainInfo, err := GetChainInfo("bitcoin")
+	if err != nil {
+		return fmt.Errorf("failed to get Bitcoin chain info: %w", err)
+	}
+
+	client := NewBitcoinClient(chainInfo.DefaultRPC, cm.httpClient)
+
+	return cm.RegisterClient(client)
+}
+
 // registerDefaultClients registers the default supported blockchain clients
 func (cm *ClientManager) registerDefaultClients() error {
-	// Get all supported chains from registry
 	chains := ListSupportedChains()
 
 	for _, chain := range chains {
@@ -82,7 +140,6 @@ func (cm *ClientManager) registerDefaultClients() error {
 			return fmt.Errorf("failed to get chain info for %s: %w", chain, err)
 		}
 
-		// Create appropriate client based on chain type
 		var client Client
 		switch chainInfo.Type {
 		case ChainTypeEVM:
@@ -91,18 +148,14 @@ func (cm *ClientManager) registerDefaultClients() error {
 			} else if chain == "polygon" {
 				client = NewPolygonClient(chainInfo.DefaultRPC, cm.httpClient)
 			} else {
-				// Generic EVM client for other EVM chains
-				// This would be implemented as needed
-				continue
+				client = NewGenericEVMClient(chain, chainInfo.DefaultRPC, cm.httpClient)
 			}
 		case ChainTypeBitcoin:
 			client = NewBitcoinClient(chainInfo.DefaultRPC, cm.httpClient)
 		default:
-			// Skip chains we don't have client implementations for yet
 			continue
 		}
 
-		// Register the client
 		if err := cm.RegisterClient(client); err != nil {
 			return err
 		}

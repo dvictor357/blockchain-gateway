@@ -62,9 +62,9 @@ func main() {
 	logger.Printf("Starting blockchain RPC gateway service with log level: %s...", appConfig.LogLevel)
 
 	startupMessage := `
-   ____  _            _        _           _         ______      _ 
+   ____  _            _        _           _         ______      _
   |  _ \| |          | |      | |         (_)       / _____)    | |
-  | |_) | | ___   ___| |  ____| |__  _____ _ ____  | /  ___  ___| |_ _____ 
+  | |_) | | ___   ___| |  ____| |__  _____ _ ____  | /  ___  ___| |_ _____
   |  _ <| |/ _ \ / __| | / ___)  _ \(____ | |  _ \ | | (___)/ _ |  _) ___ |
   | |_) ) | |_| | (__| |( (___| | | / ___ | | | | || \____( |_| | |_| ____|
   |____/|_|\___/ \___)\_)____)_| |__\_____|_|_| |_| \_____/ \___|\___)____)
@@ -91,7 +91,7 @@ func main() {
 	}
 	logger.Println("Database migrations completed successfully.")
 
-	clientManager, err := blockchain.NewClientManager()
+	clientManager, err := blockchain.NewClientManager(appConfig)
 	if err != nil {
 		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
 	}
