@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 // EVMClient represents a generic EVM-compatible blockchain client
@@ -44,6 +49,12 @@ func (c *EVMClient) Name() string {
 
 // Execute executes an RPC method on the EVM blockchain
 func (c *EVMClient) Execute(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
+	// Parse RPC URL
+	parsedURL, err := url.Parse(c.rpcURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse RPC URL: %w", err)
+	}
+
 	// Generate unique request ID
 	id := atomic.AddUint64(&c.requestID, 1)
 
@@ -61,22 +72,6 @@ func (c *EVMClient) Execute(ctx context.Context, method string, params interface
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.rpcURL, strings.NewReader(string(requestBody)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// Execute HTTP request
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Parse response
 	var rpcResponse struct {
 		JSONRPC string          `json:"jsonrpc"`
 		Result  json.RawMessage `json:"result"`
@@ -88,13 +83,76 @@ func (c *EVMClient) Execute(ctx context.Context, method string, params interface
 		ID uint64 `json:"id"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&rpcResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	switch parsedURL.Scheme {
+	case "http", "https":
+		// Create HTTP request
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", c.rpcURL, strings.NewReader(string(requestBody)))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		// Execute HTTP request
+		resp, err := c.httpClient.Do(httpReq)
+		if err != nil {
+			return nil, fmt.Errorf("HTTP request failed: %w", err)
+		}
+		defer resp.Body.Close()
+
+		// Decode response
+		if err := json.NewDecoder(resp.Body).Decode(&rpcResponse); err != nil {
+			return nil, fmt.Errorf("failed to decode HTTP response: %w", err)
+		}
+	case "ws", "wss":
+		// Establish WebSocket connection
+		dialer := websocket.Dialer{
+			Proxy:            http.ProxyFromEnvironment,
+			HandshakeTimeout: 10 * time.Second, // Timeout for WebSocket handshake
+		}
+		conn, _, err := dialer.DialContext(ctx, c.rpcURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to connect to WebSocket: %w", err)
+		}
+		defer conn.Close()
+
+		// Set write deadline
+		if err := conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			return nil, fmt.Errorf("failed to set write deadline: %w", err)
+		}
+
+		// Send request over WebSocket
+		if err := conn.WriteMessage(websocket.TextMessage, requestBody); err != nil {
+			return nil, fmt.Errorf("failed to write message to WebSocket: %w", err)
+		}
+
+		// Set read deadline
+		if err := conn.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+			return nil, fmt.Errorf("failed to set read deadline: %w", err)
+		}
+
+		// Read response
+		_, responseBody, err := conn.ReadMessage()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read message from WebSocket: %w", err)
+		}
+
+		// Unmarshal response
+		if err := json.Unmarshal(responseBody, &rpcResponse); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal WebSocket response: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported RPC scheme: %s", parsedURL.Scheme)
 	}
 
 	// Check for RPC error
 	if rpcResponse.Error != nil {
+		log.Printf("RPC Error: Code %d, Message: %s, Data: %s\n", rpcResponse.Error.Code, rpcResponse.Error.Message, rpcResponse.Error.Data)
 		return nil, fmt.Errorf("RPC error %d: %s", rpcResponse.Error.Code, rpcResponse.Error.Message)
+	}
+
+	// Check if response ID matches request ID
+	if rpcResponse.ID != id {
+		return nil, fmt.Errorf("response ID (%d) does not match request ID (%d)", rpcResponse.ID, id)
 	}
 
 	return rpcResponse.Result, nil
