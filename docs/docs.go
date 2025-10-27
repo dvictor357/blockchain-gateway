@@ -12,7 +12,7 @@ const docTemplate = `{
         "contact": {
             "name": "API Support",
             "url": "https://github.com/dvictor357/blockchain-gateway",
-            "email": "support@example.com"
+            "email": "dvictor.3579@gmail.com"
         },
         "license": {
             "name": "MIT",
