@@ -28,6 +28,8 @@ blockchain-gateway
 # IDE specific files
 .idea/
 .vscode/
+.kiro/
+.windsurf/
 *.swp
 *.swo
 .DS_Store
@@ -41,3 +43,9 @@ blockchain-gateway
 
 # Debug files
 __debug_bin
+
+# AI Coding Tools
+.claude/
+.opencode/
+.copilot/
+.factory/
