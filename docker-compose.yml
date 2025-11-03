@@ -1,6 +1,19 @@
-version: '3.8'
+version: "3.8"
 
 services:
+  # Redis for rate limiting and caching
+  redis:
+    image: redis:7-alpine
+    container_name: blockchain-gateway-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - blockchain-network
+    restart: unless-stopped
+
   # Development service with hot-reloading
   blockchain-gateway-dev:
     build:
@@ -12,6 +25,8 @@ services:
       - go-modules:/go/pkg/mod
     ports:
       - "8080:8080"
+    depends_on:
+      - redis
     environment:
       - GIN_MODE=debug
       - PORT=8080
@@ -19,6 +34,9 @@ services:
       - BTC_RPC_URL=https://btc.getblock.io/mainnet
       - LOG_LEVEL=debug
       - REQUEST_TIMEOUT=30
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_ENABLED=true
     networks:
       - blockchain-network
     restart: unless-stopped
@@ -56,4 +74,6 @@ networks:
 
 volumes:
   go-modules:
+    driver: local
+  redis_data:
     driver: local

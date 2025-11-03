@@ -20,6 +20,10 @@ const (
 	defaultDBName     = "blockchain_gateway"
 	defaultDBSSLMode  = "disable"
 
+	defaultRedisHost = "localhost"
+	defaultRedisPort = "6379"
+	defaultRedisDB   = 0
+
 	defaultCoinGeckoBaseURL    = "https://api.coingecko.com/api/v3"
 	defaultCoinGeckoPerPage    = 100
 	defaultCoinGeckoOrder      = "market_cap_desc"
@@ -56,6 +60,15 @@ type CoinGeckoConfig struct {
 	// Add API Key if needed in future
 }
 
+// RedisConfig holds Redis connection parameters
+type RedisConfig struct {
+	Host     string
+	Port     string
+	Password string
+	DB       int
+	Enabled  bool
+}
+
 // ChainConfig holds configuration for individual blockchain networks
 type ChainConfig struct {
 	Name        string `json:"name"`
@@ -79,6 +92,7 @@ type AppConfig struct {
 	Server        ServerConfig
 	Database      DatabaseConfig
 	CoinGecko     CoinGeckoConfig
+	Redis         RedisConfig
 	Chains        ChainsConfig
 	LogLevel      string
 	MigrationsDir string
@@ -106,6 +120,13 @@ func LoadConfig() *AppConfig {
 			PerPage:    GetIntEnv("COINGECKO_PER_PAGE", defaultCoinGeckoPerPage),
 			Order:      GetStringEnv("COINGECKO_ORDER", defaultCoinGeckoOrder),
 			VsCurrency: GetStringEnv("COINGECKO_VS_CURRENCY", defaultCoinGeckoVsCurrency),
+		},
+		Redis: RedisConfig{
+			Host:     GetStringEnv("REDIS_HOST", defaultRedisHost),
+			Port:     GetStringEnv("REDIS_PORT", defaultRedisPort),
+			Password: GetStringEnv("REDIS_PASSWORD", ""),
+			DB:       GetIntEnv("REDIS_DB", defaultRedisDB),
+			Enabled:  GetBoolEnv("REDIS_ENABLED", false),
 		},
 		Chains:        LoadChainsConfig(),
 		LogLevel:      GetStringEnv("LOG_LEVEL", defaultLogLevel),

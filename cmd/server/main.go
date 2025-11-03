@@ -44,8 +44,11 @@ import (
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/dvictor357/blockchain-gateway/pkg/database"
 	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
+	"github.com/dvictor357/blockchain-gateway/pkg/middleware"
+	redis "github.com/dvictor357/blockchain-gateway/pkg/rediscache"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	goredis "github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -91,6 +94,30 @@ func main() {
 	}
 	logger.Println("Database migrations completed successfully.")
 
+	// Initialize Redis client for distributed rate limiting and caching
+	var (
+		redisClient  *goredis.Client
+		redisEnabled bool
+	)
+
+	if appConfig.Redis.Enabled {
+		redisClient = redis.NewClient(appConfig.Redis)
+
+		// Verify Redis connectivity with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := redis.Ping(ctx, redisClient); err != nil {
+			logger.Printf("Warning: Redis connection failed: %v", err)
+			logger.Println("Falling back to in-memory rate limiting")
+		} else {
+			logger.Println("Redis client initialized and connected successfully")
+			redisEnabled = true
+		}
+	} else {
+		logger.Println("Redis is disabled - using in-memory fallback for rate limiting")
+	}
+
 	clientManager, err := blockchain.NewClientManager(appConfig)
 	if err != nil {
 		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
@@ -120,7 +147,16 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(api.LoggingMiddleware(logger))
-	router.Use(api.RateLimit(appConfig.Server.RateLimit))
+
+	// Use Redis-based rate limiting if Redis is available
+	if redisEnabled {
+		router.Use(middleware.RequestIDMiddleware())
+		router.Use(middleware.RateLimitMiddleware(appConfig.Redis, appConfig.Server, redisClient))
+	} else {
+		// Fallback to in-memory rate limiting
+		router.Use(middleware.RequestIDMiddleware())
+		router.Use(api.RateLimit(appConfig.Server.RateLimit))
+	}
 
 	router.GET("/health", healthCheckHandler)
 
@@ -192,6 +228,15 @@ func main() {
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	// Cleanup Redis resources during graceful shutdown
+	if redisEnabled && redisClient != nil {
+		if err := redis.Close(redisClient); err != nil {
+			logger.Printf("Warning: Redis connection cleanup failed: %v", err)
+		} else {
+			logger.Println("Redis client connection closed successfully")
+		}
 	}
 
 	logger.Println("Server gracefully stopped")
