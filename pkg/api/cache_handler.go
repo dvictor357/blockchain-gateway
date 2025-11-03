@@ -11,15 +11,15 @@ import (
 
 // CacheHandler manages cache-related API operations
 type CacheHandler struct {
-	cachedClientManager *blockchain.CachedClientManager
-	logger              *log.Logger
+	clientManager *blockchain.ClientManager
+	logger        *log.Logger
 }
 
 // NewCacheHandler creates a new cache handler
-func NewCacheHandler(cachedClientManager *blockchain.CachedClientManager, logger *log.Logger) *CacheHandler {
+func NewCacheHandler(clientManager *blockchain.ClientManager, logger *log.Logger) *CacheHandler {
 	return &CacheHandler{
-		cachedClientManager: cachedClientManager,
-		logger:              logger,
+		clientManager: clientManager,
+		logger:        logger,
 	}
 }
 
@@ -32,7 +32,7 @@ func NewCacheHandler(cachedClientManager *blockchain.CachedClientManager, logger
 // @Failure      500  {object}  api.SwaggerErrorResponse
 // @Router       /api/v1/cache/stats [get]
 func (h *CacheHandler) GetCacheStats(c *gin.Context) {
-	stats, err := h.cachedClientManager.GetCacheStats(c.Request.Context())
+	stats, err := h.clientManager.GetCacheStats(c.Request.Context())
 	if err != nil {
 		h.logger.Printf("Error getting cache stats: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -63,7 +63,7 @@ func (h *CacheHandler) InvalidateCache(c *gin.Context) {
 	}
 
 	h.logger.Printf("Invalidating cache with pattern: %s", pattern)
-	err := h.cachedClientManager.InvalidateCache(c.Request.Context(), pattern)
+	err := h.clientManager.InvalidateCache(c.Request.Context(), pattern)
 	if err != nil {
 		h.logger.Printf("Error invalidating cache with pattern %s: %v", pattern, err)
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -102,7 +102,7 @@ func (h *CacheHandler) ClearAllCache(c *gin.Context) {
 	}
 
 	for _, pattern := range patterns {
-		err := h.cachedClientManager.InvalidateCache(ctx, pattern)
+		err := h.clientManager.InvalidateCache(ctx, pattern)
 		if err != nil {
 			h.logger.Printf("Warning: failed to clear pattern %s: %v", pattern, err)
 		}
@@ -127,7 +127,7 @@ func (h *CacheHandler) ClearAllCache(c *gin.Context) {
 func (h *CacheHandler) GetLayerStats(c *gin.Context) {
 	layer := c.Param("layer")
 
-	stats, err := h.cachedClientManager.GetCacheStats(c.Request.Context())
+	stats, err := h.clientManager.GetCacheStats(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": fmt.Sprintf("failed to get cache stats: %v", err),

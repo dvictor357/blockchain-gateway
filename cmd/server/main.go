@@ -120,25 +120,17 @@ func main() {
 		logger.Println("Redis is disabled - using in-memory fallback for rate limiting")
 	}
 
-	clientManager, err := blockchain.NewClientManager(appConfig)
-	if err != nil {
-		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
-	}
-
-	// Initialize multi-layer caching system
-	var cachedClientManager *blockchain.CachedClientManager
-	cacheBuilder := cache.NewCacheBuilder()
-
-	// Build cache aggregator with all layers (L1, L2, L3)
-	cacheAggregator, err := cacheBuilder.Build(appConfig, db)
+	// Initialize caching system
+	cacheAggregator, err := cache.NewDefaultCacheAggregator(appConfig)
 	if err != nil {
 		logger.Fatalf("Failed to initialize cache system: %v", err)
 	}
-	logger.Println("Multi-layer caching system initialized successfully")
+	logger.Println("Caching system initialized successfully")
 
-	// Wrap the client manager with caching
-	cachedClientManager = blockchain.NewCachedClientManager(clientManager, cacheAggregator)
-	logger.Println("Caching enabled for RPC operations")
+	clientManager, err := blockchain.NewClientManager(appConfig, cacheAggregator)
+	if err != nil {
+		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
+	}
 
 	cgClient := coingecko.NewClient(nil, appConfig.CoinGecko.BaseURL)
 	marketRepo := marketdata.NewPostgresMarketRepository(db)
@@ -167,9 +159,9 @@ func main() {
 	healthHandler := api.NewHealthHandler(healthChecker, logger)
 
 	// Create cache handler
-	cacheHandler := api.NewCacheHandler(cachedClientManager, logger)
+	cacheHandler := api.NewCacheHandler(clientManager, logger)
 
-	apiHandler := api.NewHandler(cachedClientManager, logger, marketServ)
+	apiHandler := api.NewHandler(clientManager, logger, marketServ)
 
 	gin.SetMode(appConfig.Server.GinMode)
 	router := gin.New()

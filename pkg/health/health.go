@@ -183,24 +183,3 @@ func (s HealthStatus) GetStatusString() string {
 		return "Unknown"
 	}
 }
-
-// Color returns ANSI color code for the status
-func (s HealthStatus) Color() string {
-	switch s {
-	case StatusOK:
-		return "\033[32m" // Green
-	case StatusWarning:
-		return "\033[33m" // Yellow
-	case StatusCritical:
-		return "\033[31m" // Red
-	case StatusUnknown:
-		return "\033[36m" // Cyan
-	default:
-		return "\033[0m" // Default
-	}
-}
-
-// ResetColor resets ANSI color
-func (s HealthStatus) ResetColor() string {
-	return "\033[0m"
-}

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/cache"
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
 )
 
@@ -21,11 +22,13 @@ var (
 	ErrRPCTimeout        = errors.New("RPC request timeout")
 )
 
-// ClientManager manages all blockchain clients
+// ClientManager manages all blockchain clients with optional caching
 type ClientManager struct {
 	clients    map[string]Client
 	mu         sync.RWMutex
 	httpClient *http.Client
+	cache      *cache.CacheAggregator
+	enabled    bool
 }
 
 // Client represents a blockchain RPC client
@@ -63,12 +66,14 @@ type RPCError struct {
 }
 
 // NewClientManager creates a new client manager with configuration
-func NewClientManager(appConfig *config.AppConfig) (*ClientManager, error) {
+func NewClientManager(appConfig *config.AppConfig, cache *cache.CacheAggregator) (*ClientManager, error) {
 	manager := &ClientManager{
 		clients: make(map[string]Client),
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		cache:   cache,
+		enabled: cache != nil,
 	}
 
 	// Load chains from configuration first
@@ -219,11 +224,23 @@ func (cm *ClientManager) ListChains() []string {
 	return availableChains
 }
 
-// Execute executes an RPC method on the specified blockchain
+// Execute executes an RPC method on the specified blockchain with optional caching
 func (cm *ClientManager) Execute(ctx context.Context, chain, method string, params interface{}) (json.RawMessage, error) {
 	client, err := cm.GetClient(chain)
 	if err != nil {
 		return nil, err
+	}
+
+	// Use cache if enabled
+	if cm.enabled && cm.cache != nil {
+		result, err := cm.cache.GetRPCData(ctx, chain, method, params, func(fetchCtx context.Context) (json.RawMessage, error) {
+			return client.Execute(fetchCtx, method, params)
+		})
+
+		if err == nil {
+			return result, nil
+		}
+		// Fall through to direct execution on cache error
 	}
 
 	return client.Execute(ctx, method, params)
@@ -288,11 +305,27 @@ func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][
 	return results, nil
 }
 
-// GetBalance retrieves the balance for an address
+// GetBalance retrieves the balance for an address with optional caching
 func (cm *ClientManager) GetBalance(ctx context.Context, chain, address string) (*Balance, error) {
 	client, err := cm.GetClient(chain)
 	if err != nil {
 		return nil, err
+	}
+
+	// Use cache if enabled
+	if cm.enabled && cm.cache != nil {
+		result, err := cm.cache.GetBalanceData(ctx, chain, address, func(fetchCtx context.Context) (json.RawMessage, error) {
+			return client.GetBalance(fetchCtx, address)
+		})
+
+		if err == nil {
+			var balance Balance
+			if err := json.Unmarshal(result, &balance); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal balance: %w", err)
+			}
+			return &balance, nil
+		}
+		// Fall through to direct execution on cache error
 	}
 
 	result, err := client.GetBalance(ctx, address)
@@ -538,4 +571,35 @@ func (cm *ClientManager) GetTransactionCount(ctx context.Context, chain, address
 	fmt.Sscanf(hexCount, "0x%x", &count)
 
 	return count, nil
+}
+
+// DisableCaching disables the cache for this client manager
+func (cm *ClientManager) DisableCaching() {
+	cm.enabled = false
+}
+
+// EnableCaching enables the cache for this client manager
+func (cm *ClientManager) EnableCaching() {
+	cm.enabled = true
+}
+
+// IsCachingEnabled returns whether caching is enabled
+func (cm *ClientManager) IsCachingEnabled() bool {
+	return cm.enabled
+}
+
+// InvalidateCache invalidates cache entries matching a pattern
+func (cm *ClientManager) InvalidateCache(ctx context.Context, pattern string) error {
+	if cm.cache != nil {
+		return cm.cache.InvalidateByPattern(ctx, pattern)
+	}
+	return nil
+}
+
+// GetCacheStats returns cache statistics
+func (cm *ClientManager) GetCacheStats(ctx context.Context) (map[string]interface{}, error) {
+	if cm.cache != nil {
+		return cm.cache.GetStats(ctx)
+	}
+	return nil, fmt.Errorf("cache is not configured")
 }
