@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strings"
 	"sync"
@@ -31,6 +32,11 @@ type ClientManager struct {
 type Client interface {
 	Name() string
 	Execute(ctx context.Context, method string, params any) (json.RawMessage, error)
+	GetBalance(ctx context.Context, address string) (json.RawMessage, error)
+	GetLatestBlock(ctx context.Context) (json.RawMessage, error)
+	GetTransaction(ctx context.Context, hash string) (json.RawMessage, error)
+	GetGasPrice(ctx context.Context) (json.RawMessage, error)
+	GetTransactionCount(ctx context.Context, address string) (json.RawMessage, error)
 }
 
 // RPCRequest represents a JSON-RPC request
@@ -280,4 +286,256 @@ func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][
 	}
 
 	return results, nil
+}
+
+// GetBalance retrieves the balance for an address
+func (cm *ClientManager) GetBalance(ctx context.Context, chain, address string) (*Balance, error) {
+	client, err := cm.GetClient(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := client.GetBalance(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	var hexBalance string
+	if err := json.Unmarshal(result, &hexBalance); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal balance: %w", err)
+	}
+
+	// Get chain info for decimals and symbol
+	chainInfo, err := GetChainInfo(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert hex to big.Int
+	balanceInt := new(big.Int)
+	balanceInt.SetString(strings.TrimPrefix(hexBalance, "0x"), 16)
+
+	return &Balance{
+		Address:    address,
+		Balance:    balanceInt,
+		HexBalance: hexBalance,
+		Decimals:   chainInfo.Decimals,
+		Symbol:     chainInfo.NativeToken,
+		Chain:      chain,
+	}, nil
+}
+
+// GetLatestBlock retrieves the latest block
+func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*BlockInfo, error) {
+	client, err := cm.GetClient(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := client.GetLatestBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var block map[string]interface{}
+	if err := json.Unmarshal(result, &block); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal block: %w", err)
+	}
+
+	// Get chain info
+	chainInfo, err := GetChainInfo(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	var blockNumber uint64
+	var timestamp uint64
+	var txCount int
+
+	if chainInfo.Type == ChainTypeEVM {
+		// Extract block number
+		if bn, ok := block["number"].(string); ok && bn != "" {
+			fmt.Sscanf(bn, "0x%x", &blockNumber)
+		}
+
+		// Extract timestamp
+		if ts, ok := block["timestamp"].(string); ok && ts != "" {
+			fmt.Sscanf(ts, "0x%x", &timestamp)
+		}
+
+		// Extract transaction count
+		if txs, ok := block["transactions"].([]interface{}); ok {
+			txCount = len(txs)
+		}
+	} else if chainInfo.Type == ChainTypeBitcoin {
+		// For Bitcoin, we need to get block count first
+		if height, ok := block["height"].(float64); ok {
+			blockNumber = uint64(height)
+		}
+
+		if time, ok := block["time"].(float64); ok {
+			timestamp = uint64(time)
+		}
+
+		if txs, ok := block["tx"].([]interface{}); ok {
+			txCount = len(txs)
+		}
+	}
+
+	return &BlockInfo{
+		Number:           blockNumber,
+		Hash:             getString(block, "hash"),
+		ParentHash:       getString(block, "parentHash"),
+		Timestamp:        timestamp,
+		TransactionCount: txCount,
+		Chain:            chain,
+	}, nil
+}
+
+// GetTransaction retrieves a transaction
+func (cm *ClientManager) GetTransaction(ctx context.Context, chain, hash string) (*TransactionInfo, error) {
+	client, err := cm.GetClient(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := client.GetTransaction(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
+	var tx map[string]interface{}
+	if err := json.Unmarshal(result, &tx); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal transaction: %w", err)
+	}
+
+	// Check if transaction exists
+	if tx["hash"] == nil {
+		return nil, fmt.Errorf("transaction not found: %s", hash)
+	}
+
+	// Get chain info
+	chainInfo, err := GetChainInfo(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	var blockNumber uint64
+	var value *big.Int
+
+	if chainInfo.Type == ChainTypeEVM {
+		// Get block number
+		if bn, ok := tx["blockNumber"].(string); ok && bn != "" {
+			fmt.Sscanf(bn, "0x%x", &blockNumber)
+		}
+
+		// Get value
+		if val, ok := tx["value"].(string); ok && val != "" {
+			value = new(big.Int)
+			value.SetString(strings.TrimPrefix(val, "0x"), 16)
+		}
+
+		// Get transaction receipt for status
+		receiptResult, err := cm.Execute(ctx, chain, "eth_getTransactionReceipt", []interface{}{hash})
+		if err == nil {
+			var receipt map[string]interface{}
+			if err := json.Unmarshal(receiptResult, &receipt); err == nil {
+				if status, ok := receipt["status"].(string); ok {
+					if status == "0x1" {
+						tx["status"] = "success"
+					} else {
+						tx["status"] = "failed"
+					}
+				}
+			}
+		}
+	} else if chainInfo.Type == ChainTypeBitcoin {
+		// For Bitcoin, calculate total value from outputs
+		var outputValue float64
+		if vouts, ok := tx["vout"].([]interface{}); ok {
+			for _, v := range vouts {
+				if vout, ok := v.(map[string]interface{}); ok {
+					if val, ok := vout["value"].(float64); ok {
+						outputValue += val
+					}
+				}
+			}
+		}
+
+		// Convert BTC to satoshis
+		value = big.NewInt(int64(outputValue * 100000000))
+
+		// Get block info if available
+		if blockHash, ok := tx["blockhash"].(string); ok {
+			// Try to get block info to determine block number
+			blockResult, err := cm.Execute(ctx, chain, "getblock", []interface{}{blockHash})
+			if err == nil {
+				var block map[string]interface{}
+				if err := json.Unmarshal(blockResult, &block); err == nil {
+					if height, ok := block["height"].(float64); ok {
+						blockNumber = uint64(height)
+					}
+				}
+			}
+		}
+	}
+
+	return &TransactionInfo{
+		Hash:        getString(tx, "hash"),
+		From:        getString(tx, "from"),
+		To:          getString(tx, "to"),
+		Value:       value,
+		BlockNumber: blockNumber,
+		BlockHash:   getString(tx, "blockHash"),
+		Status:      getString(tx, "status"),
+		Chain:       chain,
+	}, nil
+}
+
+// GetGasPrice retrieves the gas price
+func (cm *ClientManager) GetGasPrice(ctx context.Context, chain string) (*big.Int, error) {
+	client, err := cm.GetClient(chain)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := client.GetGasPrice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var hexGasPrice string
+	if err := json.Unmarshal(result, &hexGasPrice); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal gas price: %w", err)
+	}
+
+	// Convert hex to big.Int
+	gasPrice := new(big.Int)
+	gasPrice.SetString(strings.TrimPrefix(hexGasPrice, "0x"), 16)
+
+	return gasPrice, nil
+}
+
+// GetTransactionCount retrieves the transaction count
+func (cm *ClientManager) GetTransactionCount(ctx context.Context, chain, address string) (uint64, error) {
+	client, err := cm.GetClient(chain)
+	if err != nil {
+		return 0, err
+	}
+
+	result, err := client.GetTransactionCount(ctx, address)
+	if err != nil {
+		return 0, err
+	}
+
+	var hexCount string
+	if err := json.Unmarshal(result, &hexCount); err != nil {
+		return 0, fmt.Errorf("failed to unmarshal transaction count: %w", err)
+	}
+
+	// Convert hex string to uint64
+	var count uint64
+	fmt.Sscanf(hexCount, "0x%x", &count)
+
+	return count, nil
 }

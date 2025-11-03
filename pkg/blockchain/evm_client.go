@@ -120,43 +120,6 @@ func (c *EVMClient) GetLatestBlockNumber(ctx context.Context) (uint64, error) {
 	return blockNumber, nil
 }
 
-// GetBalance returns the balance of an address at a specific block
-func (c *EVMClient) GetBalance(ctx context.Context, address string, blockNumber string) (string, error) {
-	params := []interface{}{address, blockNumber}
-	result, err := c.Execute(ctx, "eth_getBalance", params)
-	if err != nil {
-		return "", err
-	}
-
-	var balance string
-	if err := json.Unmarshal(result, &balance); err != nil {
-		return "", fmt.Errorf("failed to unmarshal balance: %w", err)
-	}
-
-	return balance, nil
-}
-
-// GetTransactionCount returns the transaction count (nonce) for an address
-func (c *EVMClient) GetTransactionCount(ctx context.Context, address string, blockNumber string) (uint64, error) {
-	params := []interface{}{address, blockNumber}
-	result, err := c.Execute(ctx, "eth_getTransactionCount", params)
-	if err != nil {
-		return 0, err
-	}
-
-	var countHex string
-	if err := json.Unmarshal(result, &countHex); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal transaction count: %w", err)
-	}
-
-	count, err := parseHexToUint64(countHex)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse transaction count: %w", err)
-	}
-
-	return count, nil
-}
-
 // SendRawTransaction broadcasts a signed transaction
 func (c *EVMClient) SendRawTransaction(ctx context.Context, signedTxData string) (string, error) {
 	params := []interface{}{signedTxData}
@@ -176,9 +139,36 @@ func (c *EVMClient) SendRawTransaction(ctx context.Context, signedTxData string)
 // parseHexToUint64 converts a hex string to uint64
 func parseHexToUint64(hexStr string) (uint64, error) {
 	// Remove 0x prefix if present
-	if strings.HasPrefix(hexStr, "0x") {
-		hexStr = strings.TrimPrefix(hexStr, "0x")
+	if after, ok := strings.CutPrefix(hexStr, "0x"); ok {
+		hexStr = after
 	}
 
 	return strconv.ParseUint(hexStr, 16, 64)
+}
+
+// Interface implementations for Client interface
+
+// GetBalance implements the Client interface
+func (c *EVMClient) GetBalance(ctx context.Context, address string) (json.RawMessage, error) {
+	return c.Execute(ctx, "eth_getBalance", []any{address, "latest"})
+}
+
+// GetLatestBlock implements the Client interface
+func (c *EVMClient) GetLatestBlock(ctx context.Context) (json.RawMessage, error) {
+	return c.Execute(ctx, "eth_blockNumber", []any{})
+}
+
+// GetTransaction implements the Client interface
+func (c *EVMClient) GetTransaction(ctx context.Context, hash string) (json.RawMessage, error) {
+	return c.Execute(ctx, "eth_getTransactionByHash", []any{hash})
+}
+
+// GetGasPrice implements the Client interface
+func (c *EVMClient) GetGasPrice(ctx context.Context) (json.RawMessage, error) {
+	return c.Execute(ctx, "eth_gasPrice", []any{})
+}
+
+// GetTransactionCount implements the Client interface
+func (c *EVMClient) GetTransactionCount(ctx context.Context, address string) (json.RawMessage, error) {
+	return c.Execute(ctx, "eth_getTransactionCount", []any{address, "latest"})
 }

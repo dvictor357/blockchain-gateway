@@ -167,21 +167,6 @@ func (c *BitcoinClient) GetRawTransaction(ctx context.Context, txid string, verb
 	return rawTx, nil
 }
 
-// GetBalance returns the balance of the specified account
-func (c *BitcoinClient) GetBalance(ctx context.Context) (float64, error) {
-	result, err := c.Execute(ctx, "getbalance", []interface{}{})
-	if err != nil {
-		return 0, err
-	}
-
-	var balance float64
-	if err := json.Unmarshal(result, &balance); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal balance: %w", err)
-	}
-
-	return balance, nil
-}
-
 // SendRawTransaction broadcasts a signed transaction to the network
 func (c *BitcoinClient) SendRawTransaction(ctx context.Context, signedTxHex string) (string, error) {
 	result, err := c.Execute(ctx, "sendrawtransaction", []interface{}{signedTxHex})
@@ -197,3 +182,52 @@ func (c *BitcoinClient) SendRawTransaction(ctx context.Context, signedTxHex stri
 	return txid, nil
 }
 
+// Interface implementations for Client interface
+
+// GetBalance returns the balance for the default account (interface implementation)
+func (c *BitcoinClient) GetBalance(ctx context.Context, address string) (json.RawMessage, error) {
+	// Bitcoin doesn't use addresses the same way as Ethereum
+	// We get the default account balance
+	result, err := c.Execute(ctx, "getbalance", []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// GetLatestBlock returns the latest block height (interface implementation)
+func (c *BitcoinClient) GetLatestBlock(ctx context.Context) (json.RawMessage, error) {
+	blockHeight, err := c.GetBlockCount(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to JSON-RPC response format
+	result, _ := json.Marshal(blockHeight)
+	return json.RawMessage(result), nil
+}
+
+// GetTransaction returns the raw transaction (interface implementation)
+func (c *BitcoinClient) GetTransaction(ctx context.Context, hash string) (json.RawMessage, error) {
+	tx, err := c.GetRawTransaction(ctx, hash, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to JSON-RPC response format
+	result, _ := json.Marshal(tx)
+	return json.RawMessage(result), nil
+}
+
+// GetGasPrice is not applicable for Bitcoin
+func (c *BitcoinClient) GetGasPrice(ctx context.Context) (json.RawMessage, error) {
+	return nil, fmt.Errorf("GetGasPrice not applicable for Bitcoin")
+}
+
+// GetTransactionCount returns the transaction count for an account
+func (c *BitcoinClient) GetTransactionCount(ctx context.Context, address string) (json.RawMessage, error) {
+	// Bitcoin doesn't have nonce like Ethereum, return 0
+	result, _ := json.Marshal(0)
+	return json.RawMessage(result), nil
+}

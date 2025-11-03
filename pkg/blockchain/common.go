@@ -1,10 +1,8 @@
 package blockchain
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -69,6 +67,8 @@ func (t TransactionInfo) MarshalJSON() ([]byte, error) {
 }
 
 // GetBalance retrieves an account balance from the specified blockchain
+// DEPRECATED: Moved to client_manager.go
+/*
 func (cm *ClientManager) GetBalance(ctx context.Context, chain, address string) (*Balance, error) {
 	chain = strings.ToLower(chain)
 
@@ -139,8 +139,11 @@ func (cm *ClientManager) GetBalance(ctx context.Context, chain, address string) 
 
 	return balance, nil
 }
+*/
 
 // GetLatestBlock retrieves the latest block information for the specified blockchain
+// DEPRECATED: Moved to client_manager.go
+/*
 func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*BlockInfo, error) {
 	chain = strings.ToLower(chain)
 
@@ -263,8 +266,11 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 
 	return blockInfo, nil
 }
+*/
 
 // GetTransaction retrieves transaction details for the specified transaction hash
+// DEPRECATED: Moved to client_manager.go
+/*
 func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash string) (*TransactionInfo, error) {
 	chain = strings.ToLower(chain)
 
@@ -396,8 +402,11 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 
 	return txInfo, nil
 }
+*/
 
 // GetGasPrice returns the current gas price for EVM-compatible chains
+// DEPRECATED: Moved to client_manager.go
+/*
 func (cm *ClientManager) GetGasPrice(ctx context.Context, chain string) (*big.Int, error) {
 	chain = strings.ToLower(chain)
 
@@ -423,8 +432,11 @@ func (cm *ClientManager) GetGasPrice(ctx context.Context, chain string) (*big.In
 		return nil, fmt.Errorf("gas price not applicable for %s", chain)
 	}
 }
+*/
 
 // GetTransactionCount returns the number of transactions sent from an address
+// DEPRECATED: Moved to client_manager.go
+/*
 func (cm *ClientManager) GetTransactionCount(ctx context.Context, chain, address string) (uint64, error) {
 	chain = strings.ToLower(chain)
 
@@ -450,6 +462,7 @@ func (cm *ClientManager) GetTransactionCount(ctx context.Context, chain, address
 		return 0, fmt.Errorf("get transaction count not implemented for %s", chain)
 	}
 }
+*/
 
 // Helper functions
 

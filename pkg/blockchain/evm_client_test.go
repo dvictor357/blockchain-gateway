@@ -288,7 +288,7 @@ func TestEVMClient_GetBalance(t *testing.T) {
 			client := NewEVMClient("test", server.URL, nil)
 			ctx := context.Background()
 
-			result, err := client.GetBalance(ctx, tt.address, tt.blockNumber)
+			result, err := client.GetBalance(ctx, tt.address)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)
@@ -343,7 +343,7 @@ func TestEVMClient_GetTransactionCount(t *testing.T) {
 			client := NewEVMClient("test", server.URL, nil)
 			ctx := context.Background()
 
-			result, err := client.GetTransactionCount(ctx, tt.address, tt.blockNumber)
+			result, err := client.GetTransactionCount(ctx, tt.address)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)

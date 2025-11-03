@@ -6,12 +6,6 @@ import (
 	"github.com/dvictor357/blockchain-gateway/pkg/validation"
 )
 
-// HealthResponse represents the health check response
-type HealthResponse struct {
-	Status string `json:"status" example:"ok"`
-	Time   string `json:"time" example:"2023-05-15T14:30:45Z"`
-}
-
 // ChainsResponse represents the list of supported chains
 type ChainsResponse struct {
 	Chains []string `json:"chains" example:"ethereum,bitcoin,polygon"`
@@ -127,4 +121,16 @@ type SwaggerErrorResponse struct {
 	Error   string                       `json:"error" example:"Validation failed"`
 	Code    string                       `json:"code" example:"VALIDATION_ERROR"`
 	Details []validation.ValidationError `json:"details,omitempty"`
+}
+
+// CacheInvalidateResponse represents a cache invalidation response
+type CacheInvalidateResponse struct {
+	Message string `json:"message" example:"cache invalidated successfully"`
+	Pattern string `json:"pattern" example:"balance:ethereum:*"`
+}
+
+// CacheClearResponse represents a cache clear response
+type CacheClearResponse struct {
+	Message         string   `json:"message" example:"all cache layers cleared successfully"`
+	PatternsCleared []string `json:"patterns_cleared" example:"[\"rpc:*\", \"balance:*\", \"block:*\"]"`
 }

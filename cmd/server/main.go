@@ -40,9 +40,11 @@ import (
 	_ "github.com/dvictor357/blockchain-gateway/docs"
 	"github.com/dvictor357/blockchain-gateway/pkg/api"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+	"github.com/dvictor357/blockchain-gateway/pkg/cache"
 	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/dvictor357/blockchain-gateway/pkg/database"
+	"github.com/dvictor357/blockchain-gateway/pkg/health"
 	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
 	"github.com/dvictor357/blockchain-gateway/pkg/middleware"
 	redis "github.com/dvictor357/blockchain-gateway/pkg/rediscache"
@@ -123,6 +125,21 @@ func main() {
 		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
 	}
 
+	// Initialize multi-layer caching system
+	var cachedClientManager *blockchain.CachedClientManager
+	cacheBuilder := cache.NewCacheBuilder()
+
+	// Build cache aggregator with all layers (L1, L2, L3)
+	cacheAggregator, err := cacheBuilder.Build(appConfig, db)
+	if err != nil {
+		logger.Fatalf("Failed to initialize cache system: %v", err)
+	}
+	logger.Println("Multi-layer caching system initialized successfully")
+
+	// Wrap the client manager with caching
+	cachedClientManager = blockchain.NewCachedClientManager(clientManager, cacheAggregator)
+	logger.Println("Caching enabled for RPC operations")
+
 	cgClient := coingecko.NewClient(nil, appConfig.CoinGecko.BaseURL)
 	marketRepo := marketdata.NewPostgresMarketRepository(db)
 
@@ -141,7 +158,18 @@ func main() {
 
 	go marketServ.StartFetchingLoop(appCtx)
 
-	apiHandler := api.NewHandler(clientManager, logger, marketServ)
+	// Initialize health checker
+	healthConfig := health.DefaultHealthConfig()
+	healthBuilder := health.NewBuilder(healthConfig, logger)
+	healthChecker := healthBuilder.Build(appConfig, db, redisClient)
+
+	// Create health handler
+	healthHandler := api.NewHealthHandler(healthChecker, logger)
+
+	// Create cache handler
+	cacheHandler := api.NewCacheHandler(cachedClientManager, logger)
+
+	apiHandler := api.NewHandler(cachedClientManager, logger, marketServ)
 
 	gin.SetMode(appConfig.Server.GinMode)
 	router := gin.New()
@@ -158,7 +186,13 @@ func main() {
 		router.Use(api.RateLimit(appConfig.Server.RateLimit))
 	}
 
-	router.GET("/health", healthCheckHandler)
+	// Health check endpoints
+	router.GET("/health", healthHandler.HealthCheck)
+	router.GET("/health/detailed", healthHandler.DeepHealthCheck)
+	router.GET("/health/checks", healthHandler.ListHealthChecks)
+	router.GET("/health/:component", healthHandler.HealthCheckComponent)
+	router.GET("/ready", healthHandler.ReadyCheck)
+	router.GET("/live", healthHandler.LiveCheck)
 
 	// Swagger documentation endpoint
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -191,6 +225,12 @@ func main() {
 		apiV1.GET("/chains/:chain/gas-price", apiHandler.GetGasPrice)
 		apiV1.GET("/chains/:chain/address/:address/nonce", apiHandler.GetTransactionCount)
 		apiV1.GET("/markets", apiHandler.GetCoinMarkets)
+
+		// Cache management endpoints
+		apiV1.GET("/cache/stats", cacheHandler.GetCacheStats)
+		apiV1.GET("/cache/layer/:layer", cacheHandler.GetLayerStats)
+		apiV1.DELETE("/cache/invalidate", cacheHandler.InvalidateCache)
+		apiV1.DELETE("/cache/clear", cacheHandler.ClearAllCache)
 	}
 
 	addr := fmt.Sprintf("%s:%s", appConfig.Server.Host, appConfig.Server.Port)
@@ -240,19 +280,4 @@ func main() {
 	}
 
 	logger.Println("Server gracefully stopped")
-}
-
-// healthCheckHandler handles health check requests
-// @Summary      Health Check
-// @Description  Check if the API is running and healthy
-// @Tags         health
-// @Accept       json
-// @Produce      json
-// @Success      200  {object}  api.HealthResponse
-// @Router       /health [get]
-func healthCheckHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, api.HealthResponse{
-		Status: "ok",
-		Time:   time.Now().Format(time.RFC3339),
-	})
 }

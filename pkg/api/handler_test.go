@@ -25,18 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Interfaces for testing
-type ClientManagerInterface interface {
-	ListChains() []string
-	Execute(ctx context.Context, chain, method string, params interface{}) (json.RawMessage, error)
-	BatchExecute(ctx context.Context, requests map[string][]blockchain.RPCRequest) (map[string][]blockchain.RPCResponse, error)
-	GetBalance(ctx context.Context, chain, address string) (*blockchain.Balance, error)
-	GetLatestBlock(ctx context.Context, chain string) (*blockchain.BlockInfo, error)
-	GetTransaction(ctx context.Context, chain, txHash string) (*blockchain.TransactionInfo, error)
-	GetGasPrice(ctx context.Context, chain string) (*big.Int, error)
-	GetTransactionCount(ctx context.Context, chain, address string) (uint64, error)
-}
-
+// MarketDataServiceInterface for testing
 type MarketDataServiceInterface interface {
 	GetMarketDataFromDB(ctx context.Context, limit int, offset int, orderBy string, sortDirection string) ([]models.CoinMarket, int, time.Time, error)
 }

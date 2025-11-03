@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
@@ -15,9 +17,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ClientManagerInterface defines the interface for client manager operations
+type ClientManagerInterface interface {
+	Execute(ctx context.Context, chain, method string, params interface{}) (json.RawMessage, error)
+	BatchExecute(ctx context.Context, requests map[string][]blockchain.RPCRequest) (map[string][]blockchain.RPCResponse, error)
+
+	// Strongly-typed methods for common operations
+	GetBalance(ctx context.Context, chain, address string) (*blockchain.Balance, error)
+	GetLatestBlock(ctx context.Context, chain string) (*blockchain.BlockInfo, error)
+	GetTransaction(ctx context.Context, chain, hash string) (*blockchain.TransactionInfo, error)
+	GetGasPrice(ctx context.Context, chain string) (*big.Int, error)
+	GetTransactionCount(ctx context.Context, chain, address string) (uint64, error)
+
+	ListChains() []string
+}
+
 // Handler manages API requests with improved error handling and validation
 type Handler struct {
-	clientManager     *blockchain.ClientManager
+	clientManager     ClientManagerInterface
 	logger            *log.Logger
 	marketDataService *marketdata.Service
 	validator         *validation.Validator
@@ -26,7 +43,7 @@ type Handler struct {
 }
 
 // NewHandler creates a new API handler with all dependencies
-func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
+func NewHandler(clientManager ClientManagerInterface, logger *log.Logger, marketService *marketdata.Service) *Handler {
 	return &Handler{
 		clientManager:     clientManager,
 		logger:            logger,
@@ -307,18 +324,21 @@ func (h *Handler) GetGasPrice(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
-	// Get gas price
+	// Get gas price (now returns *big.Int directly)
 	gasPrice, err := h.clientManager.GetGasPrice(ctx, chain)
 	if err != nil {
 		h.errorHandler.HandleBlockchainError(c, err, "get gas price", chain)
 		return
 	}
 
+	// Convert to hex string
+	gasPriceHex := fmt.Sprintf("0x%x", gasPrice)
+
 	// Format the response
 	c.JSON(http.StatusOK, GasPriceResponse{
 		Chain:       chain,
 		GasPrice:    gasPrice.String(),
-		GasPriceHex: fmt.Sprintf("0x%x", gasPrice),
+		GasPriceHex: gasPriceHex,
 	})
 }
 
@@ -349,7 +369,7 @@ func (h *Handler) GetTransactionCount(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
 	defer cancel()
 
-	// Get transaction count
+	// Get transaction count (now returns uint64 directly)
 	count, err := h.clientManager.GetTransactionCount(ctx, chain, address)
 	if err != nil {
 		h.errorHandler.HandleBlockchainError(c, err, "get transaction count", chain)
