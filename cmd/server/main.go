@@ -37,17 +37,13 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/dvictor357/blockchain-gateway/docs"
 	"github.com/dvictor357/blockchain-gateway/pkg/api"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
 	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/dvictor357/blockchain-gateway/pkg/database"
 	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func main() {
@@ -116,52 +112,13 @@ func main() {
 
 	apiHandler := api.NewHandler(clientManager, logger, marketServ)
 
-	gin.SetMode(appConfig.Server.GinMode)
-	router := gin.New()
-	router.Use(gin.Recovery())
-	router.Use(api.LoggingMiddleware(logger))
-	router.Use(api.RateLimit(appConfig.Server.RateLimit))
-
-	router.GET("/health", healthCheckHandler)
-
-	// Swagger documentation endpoint
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	if gin.Mode() == gin.DebugMode {
-		router.Use(gin.Logger())
-		logger.Println("Running in development mode (debug) with enhanced logging")
-
-		router.GET("/debug/routes", func(c *gin.Context) {
-			routes := []string{}
-			for _, r := range router.Routes() {
-				routes = append(routes, fmt.Sprintf("%s %s", r.Method, r.Path))
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"routes": routes,
-				"count":  len(routes),
-				"mode":   gin.Mode(),
-			})
-		})
-	}
-
-	apiV1 := router.Group("/api/v1")
-	{
-		apiV1.GET("/chains", apiHandler.ListChains)
-		apiV1.POST("/chains/:chain/query", apiHandler.QueryChain)
-		apiV1.POST("/batch", apiHandler.BatchQuery)
-		apiV1.GET("/chains/:chain/address/:address/balance", apiHandler.GetBalance)
-		apiV1.GET("/chains/:chain/block/latest", apiHandler.GetLatestBlock)
-		apiV1.GET("/chains/:chain/tx/:hash", apiHandler.GetTransaction)
-		apiV1.GET("/chains/:chain/gas-price", apiHandler.GetGasPrice)
-		apiV1.GET("/chains/:chain/address/:address/nonce", apiHandler.GetTransactionCount)
-		apiV1.GET("/markets", apiHandler.GetCoinMarkets)
-	}
+	router := api.NewRouter(apiHandler, logger, appConfig.Server)
 
 	addr := fmt.Sprintf("%s:%s", appConfig.Server.Host, appConfig.Server.Port)
 	readTimeout := 15 * time.Second
 	writeTimeout := 15 * time.Second
 	idleTimeout := 60 * time.Second
-	if gin.Mode() == gin.DebugMode {
+	if appConfig.Server.Mode == "debug" {
 		readTimeout = 30 * time.Second
 		writeTimeout = 30 * time.Second
 		idleTimeout = 120 * time.Second
@@ -195,19 +152,4 @@ func main() {
 	}
 
 	logger.Println("Server gracefully stopped")
-}
-
-// healthCheckHandler handles health check requests
-// @Summary      Health Check
-// @Description  Check if the API is running and healthy
-// @Tags         health
-// @Accept       json
-// @Produce      json
-// @Success      200  {object}  api.HealthResponse
-// @Router       /health [get]
-func healthCheckHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, api.HealthResponse{
-		Status: "ok",
-		Time:   time.Now().Format(time.RFC3339),
-	})
 }

@@ -2,31 +2,50 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/dvictor357/blaze"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
-	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
+	"github.com/dvictor357/blockchain-gateway/pkg/models"
 	"github.com/dvictor357/blockchain-gateway/pkg/validation"
-	"github.com/gin-gonic/gin"
 )
+
+// BlockchainService is the blockchain functionality used by the API.
+type BlockchainService interface {
+	ListChains() []string
+	Execute(context.Context, string, string, interface{}) (json.RawMessage, error)
+	BatchExecute(context.Context, map[string][]blockchain.RPCRequest) (map[string][]blockchain.RPCResponse, error)
+	GetBalance(context.Context, string, string) (*blockchain.Balance, error)
+	GetLatestBlock(context.Context, string) (*blockchain.BlockInfo, error)
+	GetTransaction(context.Context, string, string) (*blockchain.TransactionInfo, error)
+	GetGasPrice(context.Context, string) (*big.Int, error)
+	GetTransactionCount(context.Context, string, string) (uint64, error)
+}
+
+// MarketDataService is the market data functionality used by the API.
+type MarketDataService interface {
+	GetMarketDataFromDB(context.Context, int, int, string, string) ([]models.CoinMarket, int, time.Time, error)
+}
 
 // Handler manages API requests with improved error handling and validation
 type Handler struct {
-	clientManager     *blockchain.ClientManager
+	clientManager     BlockchainService
 	logger            *log.Logger
-	marketDataService *marketdata.Service
+	marketDataService MarketDataService
 	validator         *validation.Validator
 	errorHandler      *ErrorHandler
 	apiConfig         *config.APIConfig
 }
 
 // NewHandler creates a new API handler with all dependencies
-func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
+func NewHandler(clientManager BlockchainService, logger *log.Logger, marketService MarketDataService) *Handler {
 	return &Handler{
 		clientManager:     clientManager,
 		logger:            logger,
@@ -46,10 +65,10 @@ func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, mar
 // @Success      200  {object}  api.ChainsResponse
 // @Failure      500  {object}  api.SwaggerErrorResponse
 // @Router       /api/v1/chains [get]
-func (h *Handler) ListChains(c *gin.Context) {
+func (h *Handler) ListChains(c *blaze.Context) error {
 	chains := h.clientManager.ListChains()
 
-	c.JSON(http.StatusOK, ChainsResponse{
+	return c.JSON(http.StatusOK, ChainsResponse{
 		Chains: chains,
 		Count:  len(chains),
 	})
@@ -69,26 +88,23 @@ func (h *Handler) ListChains(c *gin.Context) {
 // @Failure      500    {object}  api.SwaggerErrorResponse
 // @Failure      504    {object}  api.SwaggerErrorResponse
 // @Router       /api/v1/chains/{chain}/query [post]
-func (h *Handler) QueryChain(c *gin.Context) {
+func (h *Handler) QueryChain(c *blaze.Context) error {
 	chain := c.Param("chain")
 
 	// Validate chain name
 	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
+		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 	}
 
 	// Parse the request body
 	var request blockchain.RPCRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		h.errorHandler.HandleBindingError(c, err)
-		return
+	if err := decodeRequestJSON(c, &request); err != nil {
+		return h.errorHandler.HandleBindingError(c, err)
 	}
 
 	// Validate RPC request
 	if validationErrors := h.validator.ValidateRPCRequest(request.Method, request.Params); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
+		return h.errorHandler.HandleValidationErrors(c, validationErrors)
 	}
 
 	// Create a context with timeout
@@ -98,8 +114,7 @@ func (h *Handler) QueryChain(c *gin.Context) {
 	// Execute the RPC request
 	result, err := h.clientManager.Execute(ctx, chain, request.Method, request.Params)
 	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "execute RPC request", chain)
-		return
+		return h.errorHandler.HandleBlockchainError(c, err, "execute RPC request", chain)
 	}
 
 	// Create a JSON-RPC response
@@ -109,7 +124,7 @@ func (h *Handler) QueryChain(c *gin.Context) {
 		ID:      request.ID,
 	}
 
-	c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, response)
 }
 
 // BatchQuery handles batch RPC requests with improved validation
@@ -123,38 +138,33 @@ func (h *Handler) QueryChain(c *gin.Context) {
 // @Failure      400     {object} api.SwaggerErrorResponse
 // @Failure      500     {object} api.SwaggerErrorResponse
 // @Router       /api/v1/batch [post]
-func (h *Handler) BatchQuery(c *gin.Context) {
+func (h *Handler) BatchQuery(c *blaze.Context) error {
 	// Parse the request body
 	var batchRequest map[string][]blockchain.RPCRequest
-	if err := c.ShouldBindJSON(&batchRequest); err != nil {
-		h.errorHandler.HandleBindingError(c, err)
-		return
+	if err := decodeRequestJSON(c, &batchRequest); err != nil {
+		return h.errorHandler.HandleBindingError(c, err)
 	}
 
 	// Validate the request
 	if len(batchRequest) == 0 {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "EMPTY_BATCH",
+		return h.errorHandler.RespondWithError(c, http.StatusBadRequest, "EMPTY_BATCH",
 			"Batch request must include at least one blockchain")
-		return
 	}
 
 	if len(batchRequest) > h.apiConfig.MaxBatchSize {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "BATCH_TOO_LARGE",
+		return h.errorHandler.RespondWithError(c, http.StatusBadRequest, "BATCH_TOO_LARGE",
 			"Batch size cannot exceed %d blockchains", h.apiConfig.MaxBatchSize)
-		return
 	}
 
 	// Validate each chain and request
 	for chain, requests := range batchRequest {
 		if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-			h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-			return
+			return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 		}
 
 		for _, req := range requests {
 			if validationErrors := h.validator.ValidateRPCRequest(req.Method, req.Params); validationErrors.HasErrors() {
-				h.errorHandler.HandleValidationErrors(c, validationErrors)
-				return
+				return h.errorHandler.HandleValidationErrors(c, validationErrors)
 			}
 		}
 	}
@@ -166,11 +176,10 @@ func (h *Handler) BatchQuery(c *gin.Context) {
 	// Execute batch request
 	results, err := h.clientManager.BatchExecute(ctx, batchRequest)
 	if err != nil {
-		h.errorHandler.HandleGenericError(c, err, "execute batch request")
-		return
+		return h.errorHandler.HandleGenericError(c, err, "execute batch request")
 	}
 
-	c.JSON(http.StatusOK, results)
+	return c.JSON(http.StatusOK, results)
 }
 
 // GetBalance retrieves the balance for an address with improved validation
@@ -186,14 +195,13 @@ func (h *Handler) BatchQuery(c *gin.Context) {
 // @Failure      404      {object} api.SwaggerErrorResponse
 // @Failure      500      {object} api.SwaggerErrorResponse
 // @Router       /api/v1/chains/{chain}/address/{address}/balance [get]
-func (h *Handler) GetBalance(c *gin.Context) {
+func (h *Handler) GetBalance(c *blaze.Context) error {
 	chain := c.Param("chain")
 	address := c.Param("address")
 
 	// Validate chain and address together
 	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
+		return h.errorHandler.HandleValidationErrors(c, validationErrors)
 	}
 
 	// Create a context with timeout
@@ -203,11 +211,10 @@ func (h *Handler) GetBalance(c *gin.Context) {
 	// Get balance
 	balance, err := h.clientManager.GetBalance(ctx, chain, address)
 	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get balance", chain)
-		return
+		return h.errorHandler.HandleBlockchainError(c, err, "get balance", chain)
 	}
 
-	c.JSON(http.StatusOK, balance)
+	return c.JSON(http.StatusOK, balance)
 }
 
 // GetLatestBlock retrieves the latest block information with improved validation
@@ -222,13 +229,12 @@ func (h *Handler) GetBalance(c *gin.Context) {
 // @Failure      404    {object} api.SwaggerErrorResponse
 // @Failure      500    {object} api.SwaggerErrorResponse
 // @Router       /api/v1/chains/{chain}/block/latest [get]
-func (h *Handler) GetLatestBlock(c *gin.Context) {
+func (h *Handler) GetLatestBlock(c *blaze.Context) error {
 	chain := c.Param("chain")
 
 	// Validate chain name
 	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
+		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 	}
 
 	// Create a context with timeout
@@ -238,11 +244,10 @@ func (h *Handler) GetLatestBlock(c *gin.Context) {
 	// Get latest block
 	block, err := h.clientManager.GetLatestBlock(ctx, chain)
 	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get latest block", chain)
-		return
+		return h.errorHandler.HandleBlockchainError(c, err, "get latest block", chain)
 	}
 
-	c.JSON(http.StatusOK, block)
+	return c.JSON(http.StatusOK, block)
 }
 
 // GetTransaction retrieves transaction details with improved validation
@@ -258,14 +263,13 @@ func (h *Handler) GetLatestBlock(c *gin.Context) {
 // @Failure      404    {object} api.SwaggerErrorResponse
 // @Failure      500    {object} api.SwaggerErrorResponse
 // @Router       /api/v1/chains/{chain}/tx/{hash} [get]
-func (h *Handler) GetTransaction(c *gin.Context) {
+func (h *Handler) GetTransaction(c *blaze.Context) error {
 	chain := c.Param("chain")
 	hash := c.Param("hash")
 
 	// Validate chain and hash together
 	if validationErrors := h.validator.ValidateChainAndHash(chain, hash); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
+		return h.errorHandler.HandleValidationErrors(c, validationErrors)
 	}
 
 	// Create a context with timeout
@@ -275,11 +279,10 @@ func (h *Handler) GetTransaction(c *gin.Context) {
 	// Get transaction
 	tx, err := h.clientManager.GetTransaction(ctx, chain, hash)
 	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get transaction", chain)
-		return
+		return h.errorHandler.HandleBlockchainError(c, err, "get transaction", chain)
 	}
 
-	c.JSON(http.StatusOK, tx)
+	return c.JSON(http.StatusOK, tx)
 }
 
 // GetGasPrice retrieves the current gas price with improved validation
@@ -294,13 +297,12 @@ func (h *Handler) GetTransaction(c *gin.Context) {
 // @Failure      404    {object} api.SwaggerErrorResponse
 // @Failure      500    {object} api.SwaggerErrorResponse
 // @Router       /api/v1/chains/{chain}/gas-price [get]
-func (h *Handler) GetGasPrice(c *gin.Context) {
+func (h *Handler) GetGasPrice(c *blaze.Context) error {
 	chain := c.Param("chain")
 
 	// Validate chain name
 	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
+		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 	}
 
 	// Create a context with timeout
@@ -310,12 +312,11 @@ func (h *Handler) GetGasPrice(c *gin.Context) {
 	// Get gas price
 	gasPrice, err := h.clientManager.GetGasPrice(ctx, chain)
 	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get gas price", chain)
-		return
+		return h.errorHandler.HandleBlockchainError(c, err, "get gas price", chain)
 	}
 
 	// Format the response
-	c.JSON(http.StatusOK, GasPriceResponse{
+	return c.JSON(http.StatusOK, GasPriceResponse{
 		Chain:       chain,
 		GasPrice:    gasPrice.String(),
 		GasPriceHex: fmt.Sprintf("0x%x", gasPrice),
@@ -335,14 +336,13 @@ func (h *Handler) GetGasPrice(c *gin.Context) {
 // @Failure      404      {object} api.SwaggerErrorResponse
 // @Failure      500      {object} api.SwaggerErrorResponse
 // @Router       /api/v1/chains/{chain}/address/{address}/nonce [get]
-func (h *Handler) GetTransactionCount(c *gin.Context) {
+func (h *Handler) GetTransactionCount(c *blaze.Context) error {
 	chain := c.Param("chain")
 	address := c.Param("address")
 
 	// Validate chain and address together
 	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
+		return h.errorHandler.HandleValidationErrors(c, validationErrors)
 	}
 
 	// Create a context with timeout
@@ -352,12 +352,11 @@ func (h *Handler) GetTransactionCount(c *gin.Context) {
 	// Get transaction count
 	count, err := h.clientManager.GetTransactionCount(ctx, chain, address)
 	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get transaction count", chain)
-		return
+		return h.errorHandler.HandleBlockchainError(c, err, "get transaction count", chain)
 	}
 
 	// Format the response
-	c.JSON(http.StatusOK, TransactionCountResponse{
+	return c.JSON(http.StatusOK, TransactionCountResponse{
 		Chain:            chain,
 		Address:          address,
 		TransactionCount: count,
@@ -379,31 +378,29 @@ func (h *Handler) GetTransactionCount(c *gin.Context) {
 // @Failure      400          {object} api.SwaggerErrorResponse
 // @Failure      500          {object} api.SwaggerErrorResponse
 // @Router       /api/v1/markets [get]
-func (h *Handler) GetCoinMarkets(c *gin.Context) {
+func (h *Handler) GetCoinMarkets(c *blaze.Context) error {
 	// Parse and validate pagination parameters
-	limitStr := c.DefaultQuery("limit", strconv.Itoa(h.apiConfig.DefaultPageLimit))
-	offsetStr := c.DefaultQuery("offset", "0")
-	orderBy := c.DefaultQuery("orderBy", "market_cap_rank")
-	sortDirection := c.DefaultQuery("sortDirection", "asc")
+	query := c.Request.URL.Query()
+	limitStr := queryDefault(query, "limit", strconv.Itoa(h.apiConfig.DefaultPageLimit))
+	offsetStr := queryDefault(query, "offset", "0")
+	orderBy := queryDefault(query, "orderBy", "market_cap_rank")
+	sortDirection := queryDefault(query, "sortDirection", "asc")
 
 	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_LIMIT",
+		return h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_LIMIT",
 			"Invalid limit parameter")
-		return
 	}
 
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_OFFSET",
+		return h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_OFFSET",
 			"Invalid offset parameter")
-		return
 	}
 
 	// Validate pagination parameters
 	if validationErrors := h.validator.ValidatePaginationParams(limit, offset); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
+		return h.errorHandler.HandleValidationErrors(c, validationErrors)
 	}
 
 	// Validate and normalize limit
@@ -411,24 +408,21 @@ func (h *Handler) GetCoinMarkets(c *gin.Context) {
 
 	// Validate orderBy field
 	if validationErr := h.validator.ValidateOrderBy(orderBy, h.apiConfig.AllowedOrderByFields); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
+		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 	}
 
 	// Validate sort direction
 	if validationErr := h.validator.ValidateSortDirection(sortDirection); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
+		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
 	}
 
 	// Fetch market data
 	markets, total, latestFetchTime, err := h.marketDataService.GetMarketDataFromDB(c.Request.Context(), limit, offset, orderBy, sortDirection)
 	if err != nil {
-		h.errorHandler.HandleGenericError(c, err, "retrieve market data")
-		return
+		return h.errorHandler.HandleGenericError(c, err, "retrieve market data")
 	}
 
-	c.JSON(http.StatusOK, MarketDataResponse{
+	return c.JSON(http.StatusOK, MarketDataResponse{
 		Data: markets,
 		Pagination: PaginationInfo{
 			TotalRecords: total,
@@ -441,4 +435,19 @@ func (h *Handler) GetCoinMarkets(c *gin.Context) {
 			LastDataUpdateFromSource: latestFetchTime.Format(time.RFC3339Nano),
 		},
 	})
+}
+
+// decodeRequestJSON preserves numeric RPC params and IDs without float64 rounding.
+func decodeRequestJSON(c *blaze.Context, destination interface{}) error {
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.UseNumber()
+	return decoder.Decode(destination)
+}
+
+// queryDefault distinguishes an absent query parameter from an explicit empty value.
+func queryDefault(query map[string][]string, key, fallback string) string {
+	if values, ok := query[key]; ok && len(values) > 0 {
+		return values[0]
+	}
+	return fallback
 }

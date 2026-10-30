@@ -9,7 +9,7 @@ Blockchain Gateway provides a simplified way to interact with various blockchain
 ## Features
 
 - ✅ Support for multiple blockchains (Ethereum, Bitcoin, Polygon, and more to come)
-- ✅ Unified API for all blockchain interactions using the Gin framework
+- Unified API for all blockchain interactions using the [Blaze framework](https://github.com/dvictor357/blaze)
 - ✅ Batch requests across multiple chains
 - ✅ Convenient REST endpoints for common blockchain operations
 - ✅ Built-in request rate limiting and throttling
@@ -22,7 +22,7 @@ Blockchain Gateway provides a simplified way to interact with various blockchain
 
 ### Prerequisites
 
-- Go 1.24.3 or higher
+- Go 1.25.5 or higher (required by Blaze)
 - Git
 
 # Building from source
@@ -58,7 +58,7 @@ If you encounter any issues with Air configuration:
 
 - Check that you're using the compatible version (v1.40.4)
 - Refer to `.air.example.toml` for a detailed configuration reference
-- Try running with the `GIN_MODE=debug` environment variable for more verbose output
+- Try running with the `APP_MODE=debug` environment variable for debug routes and extended timeouts
 
 ## Using Docker
 
@@ -87,7 +87,7 @@ This development setup:
 
 - Mounts your local code into the container
 - Uses Air for hot-reloading
-- Sets Gin to debug mode for detailed logs
+- Sets the application to debug mode
 - Shares Go module cache between runs for faster builds
 
 ### Production Docker Setup
@@ -144,7 +144,7 @@ Configuration can be provided via environment variables:
 | Variable                | Description                                           | Default                            |
 | ----------------------- | ----------------------------------------------------- | ---------------------------------- |
 | `PORT`                  | Server port                                           | `8080`                             |
-| `GIN_MODE`              | Gin mode (debug, release)                             | `release`                          |
+| `APP_MODE`              | Application mode (`debug` enables debug routes)       | `release`                          |
 | `LOG_LEVEL`             | Logging level (debug, info, warn, error)              | `info`                             |
 | `REQUEST_TIMEOUT`       | Default request timeout in seconds for RPC client     | `30`                               |
 | `ETH_RPC_URL`           | Ethereum RPC URL                                      | `https://ethereum.publicnode.com`  |
@@ -160,7 +160,7 @@ Configuration can be provided via environment variables:
 | `COINGECKO_ORDER`       | CoinGecko API order parameter (e.g., market_cap_desc) | `market_cap_desc`                  |
 | `COINGECKO_VS_CURRENCY` | CoinGecko API vs_currency parameter                   | `usd`                              |
 
-Development mode (`GIN_MODE=debug`) provides:
+Development mode (`APP_MODE=debug`) provides:
 
 - Detailed request/response logging
 - Additional debug endpoints
@@ -471,8 +471,20 @@ Blockchain Gateway is built with a modular architecture that makes it easy to ad
 
 - **Client Manager** - Manages connections to different blockchain networks
 - **Blockchain Clients** - Implements blockchain-specific RPC protocols
-- **API Layer** - Provides a RESTful interface for interacting with the gateway
+- **Blaze API Layer** - Provides a RESTful interface for interacting with the gateway
 - **Request Pipeline** - Handles request validation, processing, and response formatting
+
+### Blaze integration
+
+The gateway dogfoods Blaze at pinned revision `e6059b31909a` (`v0.0.0-20251217150610-e6059b31909a`). `api.NewRouter` exposes the native Blaze routes as an `http.Handler`, retaining the existing API paths, response data, validation errors, and graceful HTTP-server shutdown.
+
+- Shared Blaze middleware wraps the HTTP boundary, so unmatched routes are also logged and rate-limited. The limiter releases its lock before downstream RPC or database work.
+- Rate limits and logs identify clients by their socket peer, not caller-supplied forwarding headers. Behind a reverse proxy, clients share the proxy's bucket; forwarding headers are not a trusted client-identity source.
+- RPC request decoding preserves numeric parameters and IDs without `float64` rounding.
+- Blaze JSON responses use `application/json` and include a trailing newline. Trailing slashes match the same API route instead of redirecting.
+- Swagger remains available at `/swagger/index.html`, with the generated specification at `/swagger/doc.json` and bundled assets served locally. No Gin Swagger adapter or AI-tool endpoints are included.
+- Handler tests exercise the production implementation through Blaze routes. Run `go test -race -cover ./pkg/api` for API and middleware regressions.
+
 
 ## Contributing
 

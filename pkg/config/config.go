@@ -9,7 +9,7 @@ import (
 const (
 	defaultPort           = "8080"
 	defaultHost           = "0.0.0.0"
-	defaultGinMode        = "release"
+	defaultAppMode        = "release"
 	defaultLogLevel       = "info"
 	defaultRequestTimeout = 30
 
@@ -32,7 +32,7 @@ const (
 type ServerConfig struct {
 	Port      string
 	Host      string
-	GinMode   string
+	Mode      string
 	RateLimit int
 	// RequestTimeout time.Duration // For http.Server, if needed directly here
 }
@@ -90,7 +90,7 @@ func LoadConfig() *AppConfig {
 		Server: ServerConfig{
 			Port:      GetStringEnv("PORT", defaultPort),
 			Host:      defaultHost,
-			GinMode:   GetStringEnv("GIN_MODE", defaultGinMode),
+			Mode:      GetStringEnv("APP_MODE", defaultAppMode),
 			RateLimit: GetIntEnv("RATE_LIMIT", 120),
 		},
 		Database: DatabaseConfig{
