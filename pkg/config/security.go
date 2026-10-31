@@ -28,8 +28,8 @@ func LoadSecurityConfig() SecurityConfig {
 }
 
 func (c SecurityConfig) Validate() error {
-	if c.APIKey != "" && strings.TrimSpace(c.APIKey) == "" {
-		return fmt.Errorf("API_KEY must not contain only whitespace")
+	if c.APIKey != strings.TrimSpace(c.APIKey) {
+		return fmt.Errorf("API_KEY must not have leading or trailing whitespace")
 	}
 	for _, method := range c.RPCMethodAllowlist {
 		if !rpcMethodName.MatchString(method) {

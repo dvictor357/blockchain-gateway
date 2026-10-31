@@ -78,7 +78,7 @@ Bitcoin has no configured address index: balance returns HTTP 501 (`OPERATION_NO
 
 By default, raw RPC calls use a finite read-only allowlist ([exact defaults](pkg/config/security.go)). Unknown methods, `admin_*`, `personal_*`, `debug_*`, signing, and transaction-send methods are denied unless explicitly named in your configured allowlist. Mixed batches are rejected before any upstream work when any method is denied. Read-only is a method policy, not a cost limit: `eth_call` and log queries can still be expensive.
 
-Set `API_KEY` to require the `X-API-Key` header. Never put a real key in a checked-in file, command history, or URL. For example, after securely exporting `API_KEY` in your shell:
+Set `API_KEY` to require the `X-API-Key` header. Leading or trailing whitespace in a configured key is rejected at startup, not silently trimmed. Never put a real key in a checked-in file, command history, or URL. For example, after securely exporting `API_KEY` in your shell:
 
 ```sh
 # The server inherits API_KEY.
@@ -94,6 +94,8 @@ RPC_METHOD_ALLOWLIST=eth_chainId,eth_blockNumber,eth_getBalance go run ./cmd/ser
 ```
 
 There are no wildcards. Explicitly enabling a send, wallet, admin, or debug method removes the read-only guarantee for that method; use an isolated node and access controls. Restrictive policies also apply to the RPC methods used by REST helpers. With `API_KEY` set, every path except exact `/health` requires the header, including Swagger, debug routes, and unknown paths. Missing or invalid keys receive HTTP 401; failed authentication attempts also count toward the rate limit. Denied RPC methods receive HTTP 403 (`RPC_METHOD_NOT_ALLOWED`).
+
+When authentication is enabled, ordinary browser navigation cannot load Swagger UI: the page, specification, and assets all require the header. Use a trusted header-injecting client/proxy or read the checked-in [JSON](docs/swagger.json) / [YAML](docs/swagger.yaml) reference. Swagger's Authorize button does not authenticate the initial page or asset requests.
 
 Use TLS at a reverse proxy for remote access. The key is a shared secret, not user management. Socket-peer rate limiting is in-memory and per process; forwarded IP headers are not trusted. Do not expose a privileged node or provider key without quotas and network controls. The gateway does not retry, fail over, load-balance, cache chain reads, or implement WebSocket subscriptions. Upstream errors are returned rather than hidden.
 
