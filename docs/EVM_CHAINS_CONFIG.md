@@ -1,288 +1,57 @@
-# EVM Chains Configuration Guide
+# Chain configuration
 
-This document explains how to configure and use multiple EVM-compatible blockchains in the Blockchain Gateway.
+The code configures **eight EVM chains plus Bitcoin**, not just Ethereum, Bitcoin, and Polygon. Seven EVM chains and Bitcoin are enabled by default (eight clients total). Fantom is disabled by default; enabling it produces nine clients. `GET /api/v1/chains` returns enabled client names, not upstream health.
 
-## Overview
+## Built-in configuration
 
-The Blockchain Gateway now supports **8 EVM-compatible blockchains** out of the box, with a configuration-driven approach that makes it easy to add more chains or customize existing ones.
+| URL name | Chain ID | Token | RPC override | Default RPC | Enabled switch / default |
+| --- | --- | --- | --- | --- | --- |
+| `ethereum` | 1 | ETH | `ETH_RPC_URL` | `https://ethereum.publicnode.com` | Always enabled |
+| `polygon` | 137 | POL | `POLYGON_RPC_URL` | `https://polygon-bor-rpc.publicnode.com` | Always enabled |
+| `bsc` | 56 | BNB | `BSC_RPC_URL` | `https://bsc-dataseed.binance.org` | `BSC_ENABLED=true` |
+| `arbitrum` | 42161 | ETH | `ARBITRUM_RPC_URL` | `https://arb1.arbitrum.io/rpc` | `ARBITRUM_ENABLED=true` |
+| `optimism` | 10 | ETH | `OPTIMISM_RPC_URL` | `https://mainnet.optimism.io` | `OPTIMISM_ENABLED=true` |
+| `base` | 8453 | ETH | `BASE_RPC_URL` | `https://mainnet.base.org` | `BASE_ENABLED=true` |
+| `avalanche` | 43114 | AVAX | `AVALANCHE_RPC_URL` | `https://api.avax.network/ext/bc/C/rpc` | `AVALANCHE_ENABLED=true` |
+| `fantom` | 250 | FTM | `FANTOM_RPC_URL` | `https://rpc.ftm.tools` | `FANTOM_ENABLED=false` |
+| `bitcoin` | — | BTC | `BTC_RPC_URL` | `https://btc.getblock.io/mainnet` | Always enabled |
 
-## Supported EVM Chains
+These are configured adapters, not a guarantee that public providers are available or free. Fantom is an opt-in legacy network; verify a suitable endpoint before enabling it. The Bitcoin example endpoint may require credentials. Use your own provider or node where necessary; keep credentials in runtime environment variables, not committed files.
 
-### Layer 1 Blockchains
-
-1. **Ethereum** - The original EVM blockchain
-2. **BNB Smart Chain (BSC)** - High performance, low fees
-3. **Avalanche C-Chain** - High throughput blockchain
-4. **Fantom** - Fast finality blockchain
-5. **Polygon** - Ethereum scaling solution
-
-### Layer 2 Blockchains
-
-1. **Arbitrum One** - Leading optimistic rollup
-2. **Optimism** - Optimistic rollup Layer 2
-3. **Base** - Coinbase's Layer 2
-
-## Configuration
-
-### Environment Variables
-
-Each EVM chain can be configured using environment variables:
-
-```bash
-# Chain RPC URL
-{CHAIN}_RPC_URL=https://rpc-endpoint.com
-
-# Enable/Disable chain (optional, defaults to true for most chains)
-{CHAIN}_ENABLED=true
+```sh
+BSC_ENABLED=false FANTOM_ENABLED=true go run ./cmd/server
 ```
 
-### Example Configuration
-
-```bash
-# BNB Smart Chain
-BSC_RPC_URL=https://bsc-dataseed.binance.org
-BSC_ENABLED=true
-
-# Arbitrum
-ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
-ARBITRUM_ENABLED=true
-
-# Base
-BASE_RPC_URL=https://mainnet.base.org
-BASE_ENABLED=true
-```
-
-### Default Configuration
-
-The system comes with sensible defaults for all chains:
-
-| Chain     | Default RPC                              | Default Status |
-| --------- | ---------------------------------------- | -------------- |
-| Ethereum  | `https://ethereum.publicnode.com`        | Always enabled |
-| Polygon   | `https://polygon-bor-rpc.publicnode.com` | Always enabled |
-| BSC       | `https://bsc-dataseed.binance.org`       | Enabled        |
-| Arbitrum  | `https://arb1.arbitrum.io/rpc`           | Enabled        |
-| Optimism  | `https://mainnet.optimism.io`            | Enabled        |
-| Base      | `https://mainnet.base.org`               | Enabled        |
-| Avalanche | `https://api.avax.network/ext/bc/C/rpc`  | Enabled        |
-| Fantom    | `https://rpc.ftm.tools`                  | Disabled       |
-
-## API Usage
-
-### List Available Chains
-
-```bash
-GET /api/v1/chains
-```
-
-Response:
+With no overrides, `/api/v1/chains` returns:
 
 ```json
 {
-  "chains": [
-    "ethereum",
-    "polygon",
-    "bsc",
-    "arbitrum",
-    "optimism",
-    "base",
-    "avalanche"
-  ],
-  "count": 7
+  "chains": ["ethereum", "polygon", "bsc", "arbitrum", "optimism", "base", "avalanche", "bitcoin"],
+  "count": 8
 }
 ```
 
-### Query Any EVM Chain
+## Reads
 
-All EVM chains support the same API endpoints:
+All enabled EVM chains use the same generic EVM client and expose balance, latest block, transaction, gas-price, and nonce REST reads. Raw RPC calls use the same allowlist across chains:
 
-```bash
-# Get balance
-GET /api/v1/chains/{chain}/address/{address}/balance
-
-# Get latest block
-GET /api/v1/chains/{chain}/block/latest
-
-# Get transaction
-GET /api/v1/chains/{chain}/tx/{hash}
-
-# Get gas price
-GET /api/v1/chains/{chain}/gas-price
-
-# Get nonce
-GET /api/v1/chains/{chain}/address/{address}/nonce
-
-# Raw RPC query
-POST /api/v1/chains/{chain}/query
+```sh
+curl -sS http://localhost:8080/api/v1/chains/base/query \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}'
 ```
 
-### Batch Queries Across Chains
+Add `X-API-Key` when `API_KEY` is configured. A configured `RPC_METHOD_ALLOWLIST` replaces the read-only defaults and also restricts methods used by REST helpers. See [README safety and access](../README.md#safety-and-access).
 
-```bash
-POST /api/v1/batch
-```
+Bitcoin supports raw node reads, latest block, and transaction lookup (subject to node indexing). Without an address index, its balance endpoint returns HTTP 501. Gas price and account nonce do not apply to Bitcoin. Bitcoin transaction hashes omit `0x`; EVM hashes include it.
 
-Request:
+## Adding an EVM chain
 
-```json
-{
-  "ethereum": [
-    { "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1 }
-  ],
-  "bsc": [
-    { "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1 }
-  ],
-  "arbitrum": [
-    { "jsonrpc": "2.0", "method": "eth_gasPrice", "params": [], "id": 1 }
-  ]
-}
-```
-
-## Adding New EVM Chains
-
-### Step 1: Update Configuration
-
-Add the new chain to `pkg/config/config.go` in the `LoadChainsConfig()` function:
-
-```go
-// New EVM Chain
-{
-    Name:        "newchain",
-    DisplayName: "New Chain",
-    NativeToken: "NEW",
-    Decimals:    18,
-    ChainID:     12345,
-    Type:        "evm",
-    RPCURL:      GetStringEnv("NEWCHAIN_RPC_URL", "https://rpc.newchain.com"),
-    Explorer:    "https://explorer.newchain.com",
-    Enabled:     GetBoolEnv("NEWCHAIN_ENABLED", true),
-},
-```
-
-### Step 2: Add Environment Variables
-
-```bash
-NEWCHAIN_RPC_URL=https://rpc.newchain.com
-NEWCHAIN_ENABLED=true
-```
-
-### Step 3: Test
-
-The new chain will automatically be available through all API endpoints!
-
-## RPC Provider Options
-
-### Free Public RPCs
-
-- **Ethereum**: `https://ethereum.publicnode.com`
-- **BSC**: `https://bsc-dataseed.binance.org`
-- **Polygon**: `https://polygon-bor-rpc.publicnode.com`
-- **Arbitrum**: `https://arb1.arbitrum.io/rpc`
-
-### Premium Providers
-
-- **Alchemy**: `https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY`
-- **Infura**: `https://mainnet.infura.io/v3/YOUR_PROJECT_ID`
-- **QuickNode**: `https://your-endpoint.quiknode.pro/YOUR_API_KEY`
-- **Ankr**: `https://rpc.ankr.com/eth`
-
-## Best Practices
-
-### Development
-
-- Use free public RPCs for development
-- Enable debug logging: `LOG_LEVEL=debug`
-- Test with multiple chains to ensure compatibility
-
-### Production
-
-- Use dedicated RPC providers (Alchemy, Infura, QuickNode)
-- Implement RPC endpoint monitoring
-- Set up fallback RPC endpoints
-- Monitor rate limits and costs
-- Use load balancers for high availability
-
-### Security
-
-- Keep RPC API keys secure
-- Use environment variables for sensitive data
-- Implement proper rate limiting
-- Monitor for unusual activity
+Add a `ChainConfig` entry in `LoadChainsConfig` in `pkg/config/config.go`, including its name, chain ID, native token, RPC URL environment override, and enabled switch. The registry and client manager load enabled entries; the validator resolves address/hash rules from the registry. Update this table, `.env.development`, API annotations, and verification coverage together. Regenerate Swagger as described in the README.
 
 ## Troubleshooting
 
-### Chain Not Available
-
-1. Check if the chain is enabled: `{CHAIN}_ENABLED=true`
-2. Verify RPC URL is accessible
-3. Check logs for connection errors
-
-### RPC Errors
-
-1. Verify API key is correct
-2. Check rate limits
-3. Test RPC endpoint directly
-4. Switch to alternative RPC provider
-
-### Performance Issues
-
-1. Use dedicated RPC providers
-2. Implement caching
-3. Monitor response times
-4. Consider geographic proximity to RPC servers
-
-## Chain-Specific Notes
-
-### BNB Smart Chain (BSC)
-
-- Very fast block times (~3 seconds)
-- Low transaction fees
-- High throughput
-- Compatible with Ethereum tooling
-
-### Arbitrum
-
-- Optimistic rollup technology
-- Lower fees than Ethereum
-- Fast finality
-- Full EVM compatibility
-
-### Optimism
-
-- Optimistic rollup
-- Ethereum-equivalent
-- Growing ecosystem
-- OP token governance
-
-### Base
-
-- Built by Coinbase
-- OP Stack based
-- Growing rapidly
-- Strong institutional backing
-
-### Avalanche C-Chain
-
-- Subnet architecture
-- Fast finality
-- High throughput
-- AVAX native token
-
-## Future Enhancements
-
-- Automatic RPC endpoint health checking
-- Dynamic RPC endpoint switching
-- Chain-specific configuration options
-- Testnet support for all chains
-- Custom gas price strategies per chain
-- Chain-specific rate limiting
-
-## Support
-
-For issues or questions about EVM chain configuration:
-
-1. Check the logs for error messages
-2. Verify environment variables are set correctly
-3. Test RPC endpoints independently
-4. Consult the API documentation
-5. Open an issue on GitHub
+- Missing chain: check its enabled switch and `/api/v1/chains`.
+- HTTP 403: the RPC method is not in the effective allowlist; do not enable privileged methods just to hide the error.
+- Upstream errors: check provider authentication, quotas, network, and whether the node supports the method. The gateway does not retry or fail over.
+- Slow queries: keep `REQUEST_TIMEOUT` within 1–120 seconds and constrain expensive reads at your provider or proxy.
