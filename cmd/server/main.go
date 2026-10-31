@@ -76,6 +76,9 @@ func run(logger *log.Logger) error {
 	if err := appConfig.Validate(); err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
+	if appConfig.Server.APIKey == "" {
+		logger.Println("WARNING: API_KEY is empty; API authentication is disabled.")
+	}
 
 	logger.Printf("Starting blockchain RPC gateway service with log level: %s...", appConfig.LogLevel)
 
