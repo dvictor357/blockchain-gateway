@@ -2,8 +2,8 @@ github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dvictor357/blaze v0.0.0-20261031064110-e0a0000a93d8 h1:DG4fjrePr2k3ZnXn5cBh57/y9eOvgCpTL1j5CQXGtJE=
-github.com/dvictor357/blaze v0.0.0-20261031064110-e0a0000a93d8/go.mod h1:4CrI7WhSfnp9HKQwoPw5xUNdEpYcELR8/0arIpg/qpk=
+github.com/dvictor357/blaze v0.1.0 h1:pF1NqcytZxNHfdBpMryImSLPTxfsltoB5PuQ+tfJ2jM=
+github.com/dvictor357/blaze v0.1.0/go.mod h1:4CrI7WhSfnp9HKQwoPw5xUNdEpYcELR8/0arIpg/qpk=
 github.com/go-openapi/jsonpointer v0.21.1 h1:whnzv/pNXtK2FbX/W9yJfRmE2gsmkfahjMKB0fZvcic=
 github.com/go-openapi/jsonpointer v0.21.1/go.mod h1:50I1STOfbY1ycR8jGz8DaMeLCdXiI6aDteEdRNNzpdk=
 github.com/go-openapi/jsonreference v0.21.0 h1:Rs+Y7hSXT83Jacb7kFyjn4ijOuVGSvOdF2+tg1TRrwQ=
