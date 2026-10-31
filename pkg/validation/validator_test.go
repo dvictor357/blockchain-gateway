@@ -1,9 +1,13 @@
 package validation
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidator_ValidateChainName(t *testing.T) {
@@ -630,6 +634,29 @@ func TestValidator_ValidateChainAndHash(t *testing.T) {
 			assert.Len(t, errors, tt.wantErrors, "Expected %d validation errors", tt.wantErrors)
 		})
 	}
+}
+
+func TestValidator_ConfiguredEVMChainsUseEVMFormats(t *testing.T) {
+	require.NoError(t, blockchain.LoadChainsFromConfig(config.ChainsConfig{EVMChains: []config.ChainConfig{
+		{Name: "validatortestevm", Type: "evm", Enabled: true},
+		{Name: "validatortestother", Type: "other", Enabled: true},
+	}}))
+	validator := NewValidator()
+
+	const (
+		evmAddress = "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+		evmHash    = "0x9c46f98547a5bf8e785e0e77472b3ca8fb5cdb9279fbc443637f781a3e9bff71"
+	)
+
+	// A 20+ character non-address previously passed the generic length-only check.
+	assert.NotEmpty(t, validator.ValidateAddress("not-an-evm-address-but-long", "validatortestevm").Message)
+	assert.Empty(t, validator.ValidateAddress(evmAddress, "validatortestevm").Message)
+	assert.NotEmpty(t, validator.ValidateTransactionHash(strings.TrimPrefix(evmHash, "0x"), "validatortestevm").Message)
+	assert.Empty(t, validator.ValidateTransactionHash(evmHash, "validatortestevm").Message)
+
+	// Chains of other types keep the generic rules.
+	assert.Empty(t, validator.ValidateAddress("not-an-evm-address-but-long", "validatortestother").Message)
+	assert.Empty(t, validator.ValidateTransactionHash(strings.TrimPrefix(evmHash, "0x"), "validatortestother").Message)
 }
 
 func TestValidationError_Error(t *testing.T) {

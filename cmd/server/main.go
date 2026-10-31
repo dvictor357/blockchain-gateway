@@ -29,7 +29,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -46,15 +48,34 @@ import (
 	"github.com/joho/godotenv"
 )
 
+const (
+	// responseWriteMargin is added to the longest handler budget to form the server write timeout.
+	responseWriteMargin = 10 * time.Second
+	shutdownTimeout     = 30 * time.Second
+	migrationTimeout    = 60 * time.Second
+)
+
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	logger := log.New(os.Stdout, "[BLOCKCHAIN-GATEWAY] ", log.LstdFlags|log.Lshortfile)
+	if err := run(logger); err != nil {
+		logger.Fatalf("%v", err)
+	}
+}
+
+// run starts the service and blocks until shutdown. It returns only after the market worker
+// has stopped and the database is closed, so callers may exit the process afterwards.
+func run(logger *log.Logger) error {
+	// A .env file is optional: environment-only startup is supported. A file that exists but
+	// cannot be read or parsed is still an error.
+	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("error loading .env file: %w", err)
 	}
 
 	appConfig := config.LoadConfig()
+	if err := appConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
 
-	logger := log.New(os.Stdout, "[BLOCKCHAIN-GATEWAY] ", log.LstdFlags|log.Lshortfile)
 	logger.Printf("Starting blockchain RPC gateway service with log level: %s...", appConfig.LogLevel)
 
 	startupMessage := `
@@ -76,20 +97,24 @@ func main() {
 		SSLMode:  appConfig.Database.SSLMode,
 	}
 
-	db, err := database.ConnectDB(dbConnectionCfg)
+	db, err := database.ConnectDB(context.Background(), dbConnectionCfg)
 	if err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
+	// Deferred first so it runs last: the market worker is stopped before the database closes.
 	defer db.Close()
 
-	if err := database.RunMigrations(db, appConfig.MigrationsDir); err != nil {
-		logger.Fatalf("Failed to run database migrations: %v", err)
+	migrationCtx, cancelMigration := context.WithTimeout(context.Background(), migrationTimeout)
+	err = database.RunMigrations(migrationCtx, db, appConfig.MigrationsDir)
+	cancelMigration()
+	if err != nil {
+		return fmt.Errorf("failed to run database migrations: %w", err)
 	}
 	logger.Println("Database migrations completed successfully.")
 
 	clientManager, err := blockchain.NewClientManager(appConfig)
 	if err != nil {
-		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
+		return fmt.Errorf("failed to initialize blockchain client manager: %w", err)
 	}
 
 	cgClient := coingecko.NewClient(nil, appConfig.CoinGecko.BaseURL)
@@ -105,51 +130,77 @@ func main() {
 	}
 	marketServ := marketdata.NewService(logger, cgClient, marketRepo, marketServiceConfig)
 
-	appCtx, cancelAppCtx := context.WithCancel(context.Background())
-	defer cancelAppCtx()
+	// The worker stops on every exit path, and its loop is awaited before the database closes.
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	workerDone := make(chan struct{})
+	if appConfig.CoinGecko.FetcherEnabled {
+		go func() {
+			defer close(workerDone)
+			marketServ.StartFetchingLoop(workerCtx)
+		}()
+	} else {
+		logger.Println("Market data fetcher disabled (MARKET_FETCHER_ENABLED=false); serving stored data only.")
+		close(workerDone)
+	}
+	defer func() {
+		cancelWorker()
+		<-workerDone
+	}()
 
-	go marketServ.StartFetchingLoop(appCtx)
-
-	apiHandler := api.NewHandler(clientManager, logger, marketServ)
+	apiConfig := config.NewAPIConfigFromServer(appConfig.Server)
+	apiHandler := api.NewHandler(clientManager, logger, marketServ, apiConfig)
 
 	router := api.NewRouter(apiHandler, logger, appConfig.Server)
 
 	addr := fmt.Sprintf("%s:%s", appConfig.Server.Host, appConfig.Server.Port)
 	readTimeout := 15 * time.Second
-	writeTimeout := 15 * time.Second
 	idleTimeout := 60 * time.Second
 	if appConfig.Server.Mode == "debug" {
 		readTimeout = 30 * time.Second
-		writeTimeout = 30 * time.Second
 		idleTimeout = 120 * time.Second
 	}
 
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      router,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       readTimeout,
+		// Must outlast the longest handler budget so a slow-but-successful response can still be written.
+		WriteTimeout: apiConfig.LongestTimeout() + responseWriteMargin,
 		IdleTimeout:  idleTimeout,
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		logger.Printf("Server listening on %s", addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("Failed to start server: %v", err)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	logger.Println("Shutting down server...")
 
-	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 30*time.Second)
+	var runErr error
+	select {
+	case <-quit:
+		logger.Println("Shutting down server...")
+	case err := <-serverErr:
+		runErr = fmt.Errorf("server failed: %w", err)
+	}
+
+	// Stop the fetcher as draining begins; its deferred wait above completes before db.Close.
+	cancelWorker()
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancelShutdown()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Fatalf("Server forced to shutdown: %v", err)
+		logger.Printf("Server did not drain cleanly, closing connections: %v", err)
+		server.Close()
+	} else {
+		logger.Println("Server gracefully stopped")
 	}
 
-	logger.Println("Server gracefully stopped")
+	return runErr
 }

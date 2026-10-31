@@ -1,8 +1,10 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -110,21 +112,84 @@ func TestErrorHandler_HandleBlockchainError(t *testing.T) {
 		},
 		{
 			name:           "not found error",
-			err:            errors.New("transaction not found"),
+			err:            fmt.Errorf("%w: transaction 0xabc", blockchain.ErrNotFound),
 			operation:      "get transaction",
 			chain:          "ethereum",
 			expectedStatus: http.StatusNotFound,
 			expectedCode:   "NOT_FOUND",
-			expectedMsg:    "Resource not found",
+		},
+		{
+			name:           "untyped text containing not found is not a 404",
+			err:            errors.New("upstream said: header not found"),
+			operation:      "get transaction",
+			chain:          "ethereum",
+			expectedStatus: http.StatusInternalServerError,
+			expectedCode:   "INTERNAL_ERROR",
 		},
 		{
 			name:           "not applicable error",
-			err:            errors.New("operation not applicable for this blockchain"),
+			err:            fmt.Errorf("%w: gas price", blockchain.ErrNotApplicable),
 			operation:      "get gas price",
 			chain:          "bitcoin",
 			expectedStatus: http.StatusBadRequest,
 			expectedCode:   "NOT_APPLICABLE",
-			expectedMsg:    "Operation not applicable for blockchain: bitcoin",
+		},
+		{
+			name:           "unsupported operation",
+			err:            fmt.Errorf("%w: address balance", blockchain.ErrOperationNotSupported),
+			operation:      "get balance",
+			chain:          "bitcoin",
+			expectedStatus: http.StatusNotImplemented,
+			expectedCode:   "OPERATION_NOT_SUPPORTED",
+		},
+		{
+			name:           "unsupported chain in batch error names the chain",
+			err:            fmt.Errorf("chain solana: %w", &blockchain.UnsupportedChainError{Chain: "solana"}),
+			operation:      "execute batch request",
+			chain:          "",
+			expectedStatus: http.StatusNotFound,
+			expectedCode:   "CHAIN_NOT_SUPPORTED",
+			expectedMsg:    "'solana'",
+		},
+		{
+			name:           "wrapped context deadline",
+			err:            fmt.Errorf("%w: request failed: %w", blockchain.ErrUpstream, context.DeadlineExceeded),
+			operation:      "get balance",
+			chain:          "ethereum",
+			expectedStatus: http.StatusGatewayTimeout,
+			expectedCode:   "RPC_TIMEOUT",
+		},
+		{
+			name:           "http client timeout",
+			err:            fmt.Errorf("%w: request failed: %w", blockchain.ErrUpstream, timeoutError{}),
+			operation:      "get balance",
+			chain:          "ethereum",
+			expectedStatus: http.StatusGatewayTimeout,
+			expectedCode:   "RPC_TIMEOUT",
+		},
+		{
+			name:           "client cancellation is not a timeout or upstream fault",
+			err:            fmt.Errorf("%w: request failed: %w", blockchain.ErrUpstream, context.Canceled),
+			operation:      "get balance",
+			chain:          "ethereum",
+			expectedStatus: http.StatusInternalServerError,
+			expectedCode:   "INTERNAL_ERROR",
+		},
+		{
+			name:           "structured upstream RPC error",
+			err:            fmt.Errorf("get balance: %w", &blockchain.RPCError{Code: -32602, Message: "invalid argument 0: not found", Data: json.RawMessage(`{"secret":"x"}`)}),
+			operation:      "get balance",
+			chain:          "ethereum",
+			expectedStatus: http.StatusBadGateway,
+			expectedCode:   "UPSTREAM_RPC_ERROR",
+		},
+		{
+			name:           "upstream protocol failure",
+			err:            fmt.Errorf("%w: HTTP status 503: secret-api-key", blockchain.ErrUpstream),
+			operation:      "get balance",
+			chain:          "ethereum",
+			expectedStatus: http.StatusBadGateway,
+			expectedCode:   "UPSTREAM_ERROR",
 		},
 		{
 			name:           "generic error",
@@ -151,8 +216,29 @@ func TestErrorHandler_HandleBlockchainError(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedCode, response.Code)
 			assert.Contains(t, response.Error, tt.expectedMsg)
+			// Upstream details are logged, never returned.
+			assert.NotContains(t, w.Body.String(), "secret")
 		})
 	}
+}
+
+// timeoutError mimics the net.Error an http.Client returns when its Timeout elapses.
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "client timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
+
+func TestErrorHandler_HandleBindingError_RequestTooLarge(t *testing.T) {
+	handler := NewErrorHandler(log.New(os.Stdout, "test", log.LstdFlags))
+
+	w := httptest.NewRecorder()
+	c := &blaze.Context{ResponseWriter: w, Request: httptest.NewRequest(http.MethodPost, "/", nil)}
+
+	assert.NoError(t, handler.HandleBindingError(c, fmt.Errorf("decode: %w", &http.MaxBytesError{Limit: 1024})))
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	assert.JSONEq(t, `{"error":"Request body exceeds the limit of 1024 bytes","code":"REQUEST_TOO_LARGE"}`, w.Body.String())
 }
 
 func TestErrorHandler_RespondWithError(t *testing.T) {

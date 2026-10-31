@@ -10,6 +10,9 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+// defaultFetchTimeout bounds one scheduled fetch; it is shorter than the one-minute schedule.
+const defaultFetchTimeout = 50 * time.Second
+
 // ServiceConfig holds configuration for the MarketDataService
 type ServiceConfig struct {
 	CoinGeckoVsCurrency      string
@@ -18,21 +21,27 @@ type ServiceConfig struct {
 	CoinGeckoPage            int
 	CoinGeckoSparkline       bool
 	CoinGeckoPriceChangePerc []string // e.g., ["1h", "24h", "7d"]
+	FetchTimeout             time.Duration
 }
 
 // Service orchestrates fetching and storing of market data.
+// Only one Service should run StartFetchingLoop against a given database.
 type Service struct {
 	logger   *log.Logger
 	cgClient *coingecko.Client
 	repo     MarketRepository
 	config   ServiceConfig
 	cron     *cron.Cron
-	stopChan chan struct{}
 }
 
 // NewService creates a new MarketDataService.
 func NewService(logger *log.Logger, cgClient *coingecko.Client, repo MarketRepository, config ServiceConfig) *Service {
-	c := cron.New(cron.WithSeconds())
+	if config.FetchTimeout <= 0 {
+		config.FetchTimeout = defaultFetchTimeout
+	}
+
+	// SkipIfStillRunning prevents a slow fetch from overlapping the next scheduled one.
+	c := cron.New(cron.WithSeconds(), cron.WithChain(cron.SkipIfStillRunning(cron.PrintfLogger(logger))))
 
 	return &Service{
 		logger:   logger,
@@ -40,40 +49,19 @@ func NewService(logger *log.Logger, cgClient *coingecko.Client, repo MarketRepos
 		repo:     repo,
 		config:   config,
 		cron:     c,
-		stopChan: make(chan struct{}),
 	}
 }
 
-// StartFetchingLoop begins the periodic fetching of market data using a cron schedule.
-// This should be run as a goroutine.
+// StartFetchingLoop begins the periodic fetching of market data using a cron schedule and
+// blocks until ctx is cancelled. On cancellation it stops scheduling and waits for a running
+// fetch (which also observes ctx) to finish before returning.
 func (s *Service) StartFetchingLoop(ctx context.Context) {
 	s.logger.Println("Initializing market data fetching loop with cron scheduler (runs at start of each minute).")
 
-	// Schedule the job
 	// The cron expression "0 * * * * *" means "at second 0 of every minute".
-	entryID, err := s.cron.AddFunc("0 * * * * *", func() {
-		// Create a new context for this specific job execution, respecting the parent context for cancellation.
-		// This is important because fetchAndStoreData takes a context.
-		jobCtx, cancelJobCtx := context.WithCancel(ctx)
-		defer cancelJobCtx() // Ensure this inner context is cancelled when the job func returns
-
-		// Check if overall service is stopping before running the job
-		select {
-		case <-s.stopChan:
-			s.logger.Println("Cron job: stopChan signaled, skipping fetch.")
-			return
-		case <-ctx.Done():
-			s.logger.Println("Cron job: main context cancelled, skipping fetch.")
-			return
-		default:
-			// Proceed with fetch
-		}
-		s.logger.Printf("Cron job triggered: fetching market data at %s", time.Now().Format(time.RFC3339))
-		s.fetchAndStoreData(jobCtx)
-	})
-
+	entryID, err := s.cron.AddFunc("0 * * * * *", func() { s.runFetchJob(ctx) })
 	if err != nil {
-		s.logger.Fatalf("Error scheduling cron job: %v", err)
+		s.logger.Printf("Error scheduling cron job: %v", err)
 		return
 	}
 	s.logger.Printf("Market data fetch job scheduled with EntryID %d, running at the start of each minute.", entryID)
@@ -81,22 +69,24 @@ func (s *Service) StartFetchingLoop(ctx context.Context) {
 	s.cron.Start()
 	s.logger.Println("Cron scheduler started.")
 
-	// Keep the StartFetchingLoop alive until a stop signal is received.
-	// This loop now primarily serves to wait for a shutdown signal for the cron scheduler.
-	select {
-	case <-s.stopChan:
-		s.logger.Println("Received stop signal on stopChan, stopping cron scheduler...")
-		shutdownCtx := s.cron.Stop()
-		<-shutdownCtx.Done()
-		s.logger.Println("Cron scheduler stopped gracefully via stopChan.")
-		return
-	case <-ctx.Done():
-		s.logger.Println("Received stop signal on main context, stopping cron scheduler...")
-		shutdownCtx := s.cron.Stop()
-		<-shutdownCtx.Done()
-		s.logger.Println("Cron scheduler stopped gracefully via context cancellation.")
+	<-ctx.Done()
+	s.logger.Println("Stopping cron scheduler...")
+	<-s.cron.Stop().Done()
+	s.logger.Println("Cron scheduler stopped gracefully.")
+}
+
+// runFetchJob performs one scheduled fetch under its own deadline, derived from the service context.
+func (s *Service) runFetchJob(ctx context.Context) {
+	if ctx.Err() != nil {
+		s.logger.Println("Cron job: context cancelled, skipping fetch.")
 		return
 	}
+
+	jobCtx, cancel := context.WithTimeout(ctx, s.config.FetchTimeout)
+	defer cancel()
+
+	s.logger.Printf("Cron job triggered: fetching market data at %s", time.Now().Format(time.RFC3339))
+	s.fetchAndStoreData(jobCtx)
 }
 
 // fetchAndStoreData performs a single fetch from CoinGecko and stores the data in the repository.
@@ -132,15 +122,13 @@ func (s *Service) fetchAndStoreData(ctx context.Context) {
 	}
 
 	s.logger.Printf("Successfully fetched %d coin markets from CoinGecko. Storing in database...", len(markets))
-	// Create a new context for the database operation, possibly with a shorter timeout
-	// For now, reuse the job's context.
-	dbCtx := ctx
-	err = s.repo.UpsertCoinMarkets(dbCtx, markets)
+	// The database write shares the job's deadline.
+	err = s.repo.UpsertCoinMarkets(ctx, markets)
 	if err != nil {
-		if dbCtx.Err() == context.Canceled {
-			s.logger.Printf("Context cancelled during UpsertCoinMarkets: %v", dbCtx.Err())
-		} else if dbCtx.Err() == context.DeadlineExceeded {
-			s.logger.Printf("Context deadline exceeded during UpsertCoinMarkets: %v", dbCtx.Err())
+		if ctx.Err() == context.Canceled {
+			s.logger.Printf("Context cancelled during UpsertCoinMarkets: %v", ctx.Err())
+		} else if ctx.Err() == context.DeadlineExceeded {
+			s.logger.Printf("Context deadline exceeded during UpsertCoinMarkets: %v", ctx.Err())
 		} else {
 			s.logger.Printf("Error storing market data in database: %v", err)
 		}

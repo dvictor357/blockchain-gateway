@@ -16,6 +16,7 @@ import (
 
 	"github.com/dvictor357/blaze"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/dvictor357/blockchain-gateway/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -105,7 +106,7 @@ func setupTestHandler() (*Handler, *MockClientManager, *MockMarketDataService) {
 	mockMarketService := &MockMarketDataService{}
 	logger := log.New(os.Stdout, "test", log.LstdFlags)
 
-	handler := NewHandler(mockClientManager, logger, mockMarketService)
+	handler := NewHandler(mockClientManager, logger, mockMarketService, config.NewAPIConfig())
 
 	return handler, mockClientManager, mockMarketService
 }
@@ -260,7 +261,7 @@ func TestHandler_BatchQuery(t *testing.T) {
 			name:           "empty batch request",
 			requestBody:    `{}`,
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `{"error":"Batch request must include at least one blockchain","code":"EMPTY_BATCH"}`,
+			expectedBody:   `{"error":"Batch request must include at least one RPC request","code":"EMPTY_BATCH"}`,
 		},
 		{
 			name:           "invalid JSON",
@@ -380,7 +381,7 @@ func TestHandler_GetLatestBlock(t *testing.T) {
 		{
 			name:           "blockchain error",
 			chain:          "ethereum",
-			mockError:      errors.New("block not found"),
+			mockError:      fmt.Errorf("%w: block", blockchain.ErrNotFound),
 			expectedStatus: http.StatusNotFound,
 		},
 	}
@@ -442,7 +443,7 @@ func TestHandler_GetTransaction(t *testing.T) {
 			name:           "transaction not found",
 			chain:          "ethereum",
 			hash:           "0x9c46f98547a5bf8e785e0e77472b3ca8fb5cdb9279fbc443637f781a3e9bff71",
-			mockError:      errors.New("transaction not found"),
+			mockError:      fmt.Errorf("%w: transaction", blockchain.ErrNotFound),
 			expectedStatus: http.StatusNotFound,
 		},
 	}
@@ -491,7 +492,7 @@ func TestHandler_GetGasPrice(t *testing.T) {
 		{
 			name:           "operation not applicable",
 			chain:          "bitcoin",
-			mockError:      errors.New("operation not applicable for this blockchain"),
+			mockError:      fmt.Errorf("%w: gas price", blockchain.ErrNotApplicable),
 			expectedStatus: http.StatusBadRequest,
 		},
 	}
@@ -674,7 +675,8 @@ func TestHandler_Integration(t *testing.T) {
 		w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
 			"/chains/ethereum/address/0x742d35Cc6634C0532925a3b844Bc454e4438f44e/balance", "", handler.GetBalance)
 
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusGatewayTimeout, w.Code)
+		assert.JSONEq(t, `{"error":"RPC request timed out","code":"RPC_TIMEOUT"}`, w.Body.String())
 		mockClientManager.AssertExpectations(t)
 	})
 }

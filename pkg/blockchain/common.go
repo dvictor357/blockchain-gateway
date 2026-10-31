@@ -4,10 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"strconv"
 	"strings"
+)
+
+const (
+	// maxBTCNumberLen and maxBTCExponent bound provider-supplied decimal text before any
+	// big-number arithmetic, so a short input such as "1e999999" cannot force huge allocations.
+	maxBTCNumberLen = 64
+	maxBTCExponent  = 32
+	// maxSatoshi is Bitcoin's 21,000,000 BTC supply cap in satoshis.
+	maxSatoshi = 2_100_000_000_000_000
+	// satoshiDigits is the number of decimal places in a BTC amount.
+	satoshiDigits = 8
 )
 
 type Balance struct {
@@ -68,16 +78,16 @@ func (t TransactionInfo) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// GetBalance retrieves an account balance from the specified blockchain
+// GetBalance retrieves an account balance from the specified blockchain.
+// Bitcoin address balances are not available: there is no address index configured, and the
+// node's wallet-wide getbalance must never be reported as an arbitrary address's balance.
 func (cm *ClientManager) GetBalance(ctx context.Context, chain, address string) (*Balance, error) {
 	chain = strings.ToLower(chain)
-
-	var balance *Balance
 
 	// Get chain info
 	chainInfo, err := GetChainInfo(chain)
 	if err != nil {
-		return nil, err
+		return nil, &UnsupportedChainError{Chain: chain}
 	}
 
 	switch chainInfo.Type {
@@ -89,55 +99,31 @@ func (cm *ClientManager) GetBalance(ctx context.Context, chain, address string) 
 		}
 
 		var hexBalance string
-		if err := json.Unmarshal(result, &hexBalance); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal balance: %w", err)
+		if err := decodeResult(result, &hexBalance, "balance"); err != nil {
+			return nil, err
 		}
 
-		// Convert hex to big.Int
-		balanceInt := new(big.Int)
-		balanceInt.SetString(strings.TrimPrefix(hexBalance, "0x"), 16)
+		balanceInt, err := parseHexBigInt(hexBalance)
+		if err != nil {
+			return nil, err
+		}
 
-		balance = &Balance{
+		return &Balance{
 			Address:    address,
 			Balance:    balanceInt,
 			HexBalance: hexBalance,
 			Decimals:   chainInfo.Decimals,
 			Symbol:     chainInfo.NativeToken,
 			Chain:      chain,
-		}
+		}, nil
 
 	case ChainTypeBitcoin:
-		// Bitcoin has a different approach to addresses
-		// First, we need to check if the server supports the account
-		// For public nodes, we'll just return a fallback value or error
-
-		result, err := cm.Execute(ctx, chain, "getbalance", []interface{}{})
-		if err != nil {
-			return nil, fmt.Errorf("%s RPC error: %w", chainInfo.DisplayName, err)
-		}
-
-		var btcBalance float64
-		if err := json.Unmarshal(result, &btcBalance); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal %s balance: %w", chainInfo.NativeToken, err)
-		}
-
-		// Convert to smallest units
-		factor := math.Pow10(chainInfo.Decimals)
-		units := big.NewInt(int64(btcBalance * factor))
-
-		balance = &Balance{
-			Address:  address,
-			Balance:  units,
-			Decimals: chainInfo.Decimals,
-			Symbol:   chainInfo.NativeToken,
-			Chain:    chain,
-		}
+		return nil, fmt.Errorf("%w: address balance lookup for %s requires an address index, which is not configured",
+			ErrOperationNotSupported, chainInfo.DisplayName)
 
 	default:
-		return nil, fmt.Errorf("balance fetch not implemented for %s", chain)
+		return nil, fmt.Errorf("%w: balance fetch for %s", ErrOperationNotSupported, chain)
 	}
-
-	return balance, nil
 }
 
 // GetLatestBlock retrieves the latest block information for the specified blockchain
@@ -149,7 +135,7 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 	// Get chain info
 	chainInfo, err := GetChainInfo(chain)
 	if err != nil {
-		return nil, err
+		return nil, &UnsupportedChainError{Chain: chain}
 	}
 
 	switch chainInfo.Type {
@@ -161,13 +147,14 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 		}
 
 		var hexBlock string
-		if err := json.Unmarshal(result, &hexBlock); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal block number: %w", err)
+		if err := decodeResult(result, &hexBlock, "block number"); err != nil {
+			return nil, err
 		}
 
-		// Convert hex string to uint64
-		var blockNumber uint64
-		fmt.Sscanf(hexBlock, "0x%x", &blockNumber)
+		blockNumber, err := parseHexToUint64(hexBlock)
+		if err != nil {
+			return nil, err
+		}
 
 		// Get block details
 		blockResult, err := cm.Execute(ctx, chain, "eth_getBlockByNumber",
@@ -177,8 +164,11 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 		}
 
 		var block map[string]interface{}
-		if err := json.Unmarshal(blockResult, &block); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal block details: %w", err)
+		if err := decodeNullableResult(blockResult, &block, "block details"); err != nil {
+			return nil, err
+		}
+		if block == nil {
+			return nil, fmt.Errorf("%w: node returned no block for its latest block number", ErrUpstream)
 		}
 
 		// Extract transaction count
@@ -187,10 +177,9 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 			txCount = len(txs)
 		}
 
-		// Extract timestamp
-		var timestamp uint64
-		if ts, ok := block["timestamp"].(string); ok {
-			fmt.Sscanf(ts, "0x%x", &timestamp)
+		timestamp, err := optionalHexUint64(block, "timestamp")
+		if err != nil {
+			return nil, err
 		}
 
 		blockInfo = &BlockInfo{
@@ -209,9 +198,9 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 			return nil, err
 		}
 
-		var blockCount int64
-		if err := json.Unmarshal(result, &blockCount); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal block count: %w", err)
+		var blockCount uint64
+		if err := decodeResult(result, &blockCount, "block count"); err != nil {
+			return nil, err
 		}
 
 		// Get block hash
@@ -221,8 +210,8 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 		}
 
 		var blockHash string
-		if err := json.Unmarshal(hashResult, &blockHash); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal block hash: %w", err)
+		if err := decodeResult(hashResult, &blockHash, "block hash"); err != nil {
+			return nil, err
 		}
 
 		// Get block details
@@ -231,34 +220,26 @@ func (cm *ClientManager) GetLatestBlock(ctx context.Context, chain string) (*Blo
 			return nil, err
 		}
 
-		var block map[string]interface{}
-		if err := json.Unmarshal(blockResult, &block); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal BTC block: %w", err)
+		var block struct {
+			Time              uint64            `json:"time"`
+			Tx                []json.RawMessage `json:"tx"`
+			PreviousBlockHash string            `json:"previousblockhash"`
 		}
-
-		// Get transaction count
-		txCount := 0
-		if txs, ok := block["tx"].([]interface{}); ok {
-			txCount = len(txs)
-		}
-
-		// Get timestamp
-		timestamp := uint64(0)
-		if ts, ok := block["time"].(float64); ok {
-			timestamp = uint64(ts)
+		if err := decodeResult(blockResult, &block, "block details"); err != nil {
+			return nil, err
 		}
 
 		blockInfo = &BlockInfo{
-			Number:           uint64(blockCount),
+			Number:           blockCount,
 			Hash:             blockHash,
-			ParentHash:       getString(block, "previousblockhash"),
-			Timestamp:        timestamp,
-			TransactionCount: txCount,
+			ParentHash:       block.PreviousBlockHash,
+			Timestamp:        block.Time,
+			TransactionCount: len(block.Tx),
 			Chain:            chain,
 		}
 
 	default:
-		return nil, fmt.Errorf("get latest block not implemented for %s", chain)
+		return nil, fmt.Errorf("%w: latest block for %s", ErrOperationNotSupported, chain)
 	}
 
 	return blockInfo, nil
@@ -273,7 +254,7 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 	// Get chain info
 	chainInfo, err := GetChainInfo(chain)
 	if err != nil {
-		return nil, err
+		return nil, &UnsupportedChainError{Chain: chain}
 	}
 
 	switch chainInfo.Type {
@@ -285,25 +266,29 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 		}
 
 		var tx map[string]interface{}
-		if err := json.Unmarshal(result, &tx); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal transaction: %w", err)
+		if err := decodeNullableResult(result, &tx, "transaction"); err != nil {
+			return nil, err
 		}
 
 		// Check if transaction exists
 		if tx["hash"] == nil {
-			return nil, fmt.Errorf("transaction not found: %s", txHash)
+			return nil, fmt.Errorf("%w: transaction %s", ErrNotFound, txHash)
 		}
 
-		// Get block number
-		var blockNumber uint64
-		if bn, ok := tx["blockNumber"].(string); ok && bn != "" {
-			fmt.Sscanf(bn, "0x%x", &blockNumber)
+		// Pending transactions have no block number
+		blockNumber, err := optionalHexUint64(tx, "blockNumber")
+		if err != nil {
+			return nil, err
 		}
 
-		// Get value as big.Int
-		value := new(big.Int)
-		if val, ok := tx["value"].(string); ok && val != "" {
-			value.SetString(strings.TrimPrefix(val, "0x"), 16)
+		// A real transaction always carries a value quantity ("0x0" is a valid zero).
+		rawValue, ok := tx["value"].(string)
+		if !ok {
+			return nil, fmt.Errorf("%w: transaction value is missing or not a string", ErrUpstream)
+		}
+		value, err := parseHexBigInt(rawValue)
+		if err != nil {
+			return nil, err
 		}
 
 		txInfo = &TransactionInfo{
@@ -316,9 +301,13 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 			Chain:       chain,
 		}
 
-		// Get transaction receipt for status
+		// The receipt only supplies the status; a failed lookup leaves it empty unless the request is over.
 		receiptResult, err := cm.Execute(ctx, chain, "eth_getTransactionReceipt", []interface{}{txHash})
-		if err == nil {
+		if err != nil {
+			if ctx.Err() != nil {
+				return nil, err
+			}
+		} else {
 			var receipt map[string]interface{}
 			if err := json.Unmarshal(receiptResult, &receipt); err == nil {
 				if status, ok := receipt["status"].(string); ok {
@@ -338,28 +327,28 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 			return nil, err
 		}
 
-		var tx map[string]interface{}
-		if err := json.Unmarshal(result, &tx); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal BTC transaction: %w", err)
+		var tx struct {
+			BlockHash string `json:"blockhash"`
+			Vout      []struct {
+				Value json.RawMessage `json:"value"`
+			} `json:"vout"`
+		}
+		if err := decodeResult(result, &tx, "transaction"); err != nil {
+			return nil, err
+		}
+		if tx.Vout == nil {
+			return nil, fmt.Errorf("%w: transaction has no outputs member", ErrUpstream)
 		}
 
-		// Bitcoin doesn't have from/to in the same way as Ethereum
-		// We need to process inputs and outputs to determine this
-
-		// Calculate total value (simplified)
-		var outputValue float64
-		if vouts, ok := tx["vout"].([]interface{}); ok {
-			for _, v := range vouts {
-				if vout, ok := v.(map[string]interface{}); ok {
-					if val, ok := vout["value"].(float64); ok {
-						outputValue += val
-					}
-				}
+		// Bitcoin has no from/to; Value is the exact sum of all outputs in satoshis.
+		satoshis := new(big.Int)
+		for _, vout := range tx.Vout {
+			amount, err := btcToSatoshi(vout.Value)
+			if err != nil {
+				return nil, err
 			}
+			satoshis.Add(satoshis, amount)
 		}
-
-		// Convert BTC to satoshis
-		satoshis := big.NewInt(int64(outputValue * 100000000))
 
 		txInfo = &TransactionInfo{
 			Hash:  txHash,
@@ -368,17 +357,21 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 		}
 
 		// Get block info if available
-		if blockHash, ok := tx["blockhash"].(string); ok {
-			txInfo.BlockHash = blockHash
+		if tx.BlockHash != "" {
+			txInfo.BlockHash = tx.BlockHash
 
 			// Try to get block info to determine block number
-			blockResult, err := cm.Execute(ctx, chain, "getblock", []interface{}{blockHash})
-			if err == nil {
-				var block map[string]interface{}
-				if err := json.Unmarshal(blockResult, &block); err == nil {
-					if height, ok := block["height"].(float64); ok {
-						txInfo.BlockNumber = uint64(height)
-					}
+			blockResult, err := cm.Execute(ctx, chain, "getblock", []interface{}{tx.BlockHash})
+			if err != nil {
+				if ctx.Err() != nil {
+					return nil, err
+				}
+			} else {
+				var block struct {
+					Height *uint64 `json:"height"`
+				}
+				if err := json.Unmarshal(blockResult, &block); err == nil && block.Height != nil {
+					txInfo.BlockNumber = *block.Height
 				}
 			}
 		}
@@ -391,7 +384,7 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 		}
 
 	default:
-		return nil, fmt.Errorf("get transaction not implemented for %s", chain)
+		return nil, fmt.Errorf("%w: transaction lookup for %s", ErrOperationNotSupported, chain)
 	}
 
 	return txInfo, nil
@@ -401,54 +394,42 @@ func (cm *ClientManager) GetTransaction(ctx context.Context, chain, txHash strin
 func (cm *ClientManager) GetGasPrice(ctx context.Context, chain string) (*big.Int, error) {
 	chain = strings.ToLower(chain)
 
-	// Check if chain is EVM-compatible
-	if IsEVMCompatible(chain) {
-		result, err := cm.Execute(ctx, chain, "eth_gasPrice", []interface{}{})
-		if err != nil {
-			return nil, err
-		}
-
-		var hexGasPrice string
-		if err := json.Unmarshal(result, &hexGasPrice); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal gas price: %w", err)
-		}
-
-		// Convert hex to big.Int
-		gasPrice := new(big.Int)
-		gasPrice.SetString(strings.TrimPrefix(hexGasPrice, "0x"), 16)
-
-		return gasPrice, nil
-
-	} else {
-		return nil, fmt.Errorf("gas price not applicable for %s", chain)
+	if !IsEVMCompatible(chain) {
+		return nil, fmt.Errorf("%w: gas price for %s", ErrNotApplicable, chain)
 	}
+
+	result, err := cm.Execute(ctx, chain, "eth_gasPrice", []interface{}{})
+	if err != nil {
+		return nil, err
+	}
+
+	var hexGasPrice string
+	if err := decodeResult(result, &hexGasPrice, "gas price"); err != nil {
+		return nil, err
+	}
+
+	return parseHexBigInt(hexGasPrice)
 }
 
 // GetTransactionCount returns the number of transactions sent from an address
 func (cm *ClientManager) GetTransactionCount(ctx context.Context, chain, address string) (uint64, error) {
 	chain = strings.ToLower(chain)
 
-	// Check if chain is EVM-compatible
-	if IsEVMCompatible(chain) {
-		result, err := cm.Execute(ctx, chain, "eth_getTransactionCount", []interface{}{address, "latest"})
-		if err != nil {
-			return 0, err
-		}
-
-		var hexCount string
-		if err := json.Unmarshal(result, &hexCount); err != nil {
-			return 0, fmt.Errorf("failed to unmarshal transaction count: %w", err)
-		}
-
-		// Convert hex string to uint64
-		var count uint64
-		fmt.Sscanf(hexCount, "0x%x", &count)
-
-		return count, nil
-
-	} else {
-		return 0, fmt.Errorf("get transaction count not implemented for %s", chain)
+	if !IsEVMCompatible(chain) {
+		return 0, fmt.Errorf("%w: transaction count for %s", ErrNotApplicable, chain)
 	}
+
+	result, err := cm.Execute(ctx, chain, "eth_getTransactionCount", []interface{}{address, "latest"})
+	if err != nil {
+		return 0, err
+	}
+
+	var hexCount string
+	if err := decodeResult(result, &hexCount, "transaction count"); err != nil {
+		return 0, err
+	}
+
+	return parseHexToUint64(hexCount)
 }
 
 // Helper functions
@@ -461,26 +442,145 @@ func getString(data map[string]interface{}, key string) string {
 	return ""
 }
 
-// getUint64 safely extracts a uint64 value from a map
-func getUint64(data map[string]interface{}, key string) uint64 {
+// optionalHexUint64 reads a hex quantity from a decoded object; a missing or null member is 0,
+// but a present member that is not a well-formed quantity is an upstream error.
+func optionalHexUint64(data map[string]interface{}, key string) (uint64, error) {
 	switch v := data[key].(type) {
-	case float64:
-		return uint64(v)
+	case nil:
+		return 0, nil
 	case string:
-		// Try to parse hex
-		if strings.HasPrefix(v, "0x") {
-			var val uint64
-			fmt.Sscanf(v, "0x%x", &val)
-			return val
-		}
-		// Try to parse decimal
-		if val, err := strconv.ParseUint(v, 10, 64); err == nil {
-			return val
-		}
-	case int64:
-		return uint64(v)
-	case uint64:
-		return v
+		return parseHexToUint64(v)
+	default:
+		return 0, fmt.Errorf("%w: %s is not a hex quantity", ErrUpstream, key)
 	}
-	return 0
+}
+
+// hexQuantityDigits validates an EVM hex quantity and returns its digits without the 0x prefix.
+// The prefix is optional, but at least one hex digit is required; signs, whitespace and
+// separators are rejected, and the value is bounded to 256 bits.
+func hexQuantityDigits(value string) (string, error) {
+	digits := strings.TrimPrefix(value, "0x")
+	if digits == "" {
+		return "", fmt.Errorf("%w: malformed hex quantity %q", ErrUpstream, snippet([]byte(value)))
+	}
+	for _, r := range digits {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f' || r >= 'A' && r <= 'F') {
+			return "", fmt.Errorf("%w: malformed hex quantity %q", ErrUpstream, snippet([]byte(value)))
+		}
+	}
+	if significant := strings.TrimLeft(digits, "0"); len(significant) > 64 {
+		return "", fmt.Errorf("%w: hex quantity exceeds 256 bits", ErrUpstream)
+	}
+	return digits, nil
+}
+
+// parseHexToUint64 converts a hex quantity to uint64
+func parseHexToUint64(hexStr string) (uint64, error) {
+	digits, err := hexQuantityDigits(hexStr)
+	if err != nil {
+		return 0, err
+	}
+	n, err := strconv.ParseUint(digits, 16, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%w: hex quantity out of range for uint64", ErrUpstream)
+	}
+	return n, nil
+}
+
+// parseHexBigInt converts a hex quantity to a big.Int
+func parseHexBigInt(hexStr string) (*big.Int, error) {
+	digits, err := hexQuantityDigits(hexStr)
+	if err != nil {
+		return nil, err
+	}
+	n, ok := new(big.Int).SetString(digits, 16)
+	if !ok {
+		return nil, fmt.Errorf("%w: malformed hex quantity", ErrUpstream)
+	}
+	return n, nil
+}
+
+// btcToSatoshi converts a JSON number holding a BTC amount to exact satoshis without
+// floating point. Decimal and scientific notation are supported. Negative, malformed,
+// fractional-satoshi and over-supply values are rejected, and the text length and exponent
+// are bounded before any big-number arithmetic.
+func btcToSatoshi(raw json.RawMessage) (*big.Int, error) {
+	text := string(raw)
+	malformed := func(reason string) (*big.Int, error) {
+		return nil, fmt.Errorf("%w: invalid BTC amount: %s", ErrUpstream, reason)
+	}
+	if text == "" || len(text) > maxBTCNumberLen {
+		return malformed("missing or too long")
+	}
+
+	pos := 0
+	digitsFrom := func() string {
+		start := pos
+		for pos < len(text) && text[pos] >= '0' && text[pos] <= '9' {
+			pos++
+		}
+		return text[start:pos]
+	}
+
+	intDigits := digitsFrom()
+	if intDigits == "" {
+		return malformed("not a non-negative number")
+	}
+	fracDigits := ""
+	if pos < len(text) && text[pos] == '.' {
+		pos++
+		if fracDigits = digitsFrom(); fracDigits == "" {
+			return malformed("empty fraction")
+		}
+	}
+	exponent := 0
+	if pos < len(text) && (text[pos] == 'e' || text[pos] == 'E') {
+		pos++
+		sign := 1
+		if pos < len(text) && (text[pos] == '+' || text[pos] == '-') {
+			if text[pos] == '-' {
+				sign = -1
+			}
+			pos++
+		}
+		expDigits := digitsFrom()
+		if expDigits == "" || len(expDigits) > 3 {
+			return malformed("bad exponent")
+		}
+		exponent, _ = strconv.Atoi(expDigits)
+		exponent *= sign
+		if exponent > maxBTCExponent || exponent < -maxBTCExponent {
+			return malformed("exponent out of range")
+		}
+	}
+	if pos != len(text) {
+		return malformed("not a number")
+	}
+
+	// value = mantissa * 10^scale satoshis
+	mantissa := strings.TrimLeft(intDigits+fracDigits, "0")
+	if mantissa == "" {
+		return new(big.Int), nil
+	}
+	scale := exponent - len(fracDigits) + satoshiDigits
+	trimmed := strings.TrimRight(mantissa, "0")
+	scale += len(mantissa) - len(trimmed)
+	mantissa = trimmed
+
+	if scale < 0 {
+		return malformed("fractional satoshi")
+	}
+	if len(mantissa)+scale > 16 {
+		return malformed("exceeds maximum supply")
+	}
+
+	satoshis, ok := new(big.Int).SetString(mantissa, 10)
+	if !ok {
+		return malformed("not a number")
+	}
+	satoshis.Mul(satoshis, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(scale)), nil))
+	if satoshis.Cmp(big.NewInt(maxSatoshi)) > 0 {
+		return malformed("exceeds maximum supply")
+	}
+	return satoshis, nil
 }

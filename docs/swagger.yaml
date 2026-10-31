@@ -76,8 +76,7 @@ definitions:
         example: -32000
         type: integer
       data:
-        example: Additional error details
-        type: string
+        type: object
       message:
         example: Server error
         type: string
@@ -305,8 +304,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Execute multiple RPC queries across different blockchain networks
-        in a single request
+      description: |-
+        Execute multiple RPC queries across different blockchain networks in a single request.
+        The total number of RPC requests across all chains is limited (10 by default); requests on one chain run sequentially.
+        Per-request node errors are returned inside the response with their original code and data.
       parameters:
       - description: Batch RPC Request
         in: body
@@ -331,6 +332,14 @@ paths:
             type: object
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "413":
+          description: Request Entity Too Large
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
         "500":
@@ -363,7 +372,9 @@ paths:
     get:
       consumes:
       - application/json
-      description: Get the native token balance for a specific address on a blockchain
+      description: |-
+        Get the native token balance for a specific address on a blockchain.
+        Bitcoin is not supported (HTTP 501, code OPERATION_NOT_SUPPORTED): no address index is configured.
       parameters:
       - description: Blockchain name
         enum:
@@ -396,6 +407,18 @@ paths:
             $ref: '#/definitions/api.SwaggerErrorResponse'
         "500":
           description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
       summary: Get Account Balance
@@ -440,6 +463,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
       summary: Get Transaction Count
       tags:
       - chains
@@ -477,6 +508,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
       summary: Get Latest Block
       tags:
       - chains
@@ -511,6 +550,14 @@ paths:
             $ref: '#/definitions/api.SwaggerErrorResponse'
         "500":
           description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
       summary: Get Gas Price
@@ -552,8 +599,16 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
         "500":
           description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "502":
+          description: Bad Gateway
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
         "504":
@@ -602,6 +657,14 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
       summary: Get Transaction Details
       tags:
       - chains
@@ -621,12 +684,13 @@ paths:
         name: offset
         required: true
         type: string
-      - description: Field to order by
+      - description: Field to order by (case-insensitive)
         enum:
         - market_cap_rank
-        - price
-        - volume_24h
-        - price_change_percentage_24h
+        - name
+        - current_price
+        - last_updated
+        - data_fetched_at
         in: query
         name: orderBy
         required: true
@@ -654,6 +718,10 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/api.SwaggerErrorResponse'
+        "504":
+          description: Gateway Timeout
+          schema:
+            $ref: '#/definitions/api.SwaggerErrorResponse'
       summary: Get Coin Markets
       tags:
       - markets
@@ -661,7 +729,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: Check if the API is running and healthy
+      description: 'Liveness only: checks that the API process serves HTTP, not database
+        or upstream readiness.'
       produces:
       - application/json
       responses:

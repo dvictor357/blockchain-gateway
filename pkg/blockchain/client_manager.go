@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +19,33 @@ var (
 	ErrChainNotSupported = errors.New("blockchain not supported")
 	ErrInvalidRequest    = errors.New("invalid RPC request")
 	ErrRPCTimeout        = errors.New("RPC request timeout")
+
+	// ErrUpstream marks failures of the upstream node exchange that are not node-reported
+	// JSON-RPC errors: transport errors, bad HTTP statuses, invalid envelopes or malformed results.
+	ErrUpstream = errors.New("upstream blockchain node failure")
+	// ErrOperationNotSupported marks operations this gateway cannot provide for a chain.
+	ErrOperationNotSupported = errors.New("operation not supported")
+	// ErrNotApplicable marks operations that do not apply to a chain type.
+	ErrNotApplicable = errors.New("operation not applicable")
+	// ErrNotFound marks a requested resource that does not exist on the chain.
+	ErrNotFound = errors.New("resource not found")
 )
+
+// defaultRequestTimeout is the upstream HTTP client timeout when none is configured.
+const defaultRequestTimeout = 30 * time.Second
+
+// UnsupportedChainError reports which requested chain is unsupported.
+type UnsupportedChainError struct {
+	Chain string
+}
+
+func (e *UnsupportedChainError) Error() string {
+	return fmt.Sprintf("%s: %s", ErrChainNotSupported, e.Chain)
+}
+
+func (e *UnsupportedChainError) Is(target error) bool {
+	return target == ErrChainNotSupported
+}
 
 // ClientManager manages all blockchain clients
 type ClientManager struct {
@@ -49,19 +76,28 @@ type RPCResponse struct {
 	ID      any             `json:"id"`
 }
 
-// RPCError represents a JSON-RPC error
+// RPCError represents a JSON-RPC error object reported by a node. Data may be any JSON value.
 type RPCError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    string `json:"data,omitempty"`
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
+}
+
+func (e *RPCError) Error() string {
+	return fmt.Sprintf("RPC error %d: %s", e.Code, e.Message)
 }
 
 // NewClientManager creates a new client manager with configuration
 func NewClientManager(appConfig *config.AppConfig) (*ClientManager, error) {
+	timeout := appConfig.Server.RequestTimeout
+	if timeout <= 0 {
+		timeout = defaultRequestTimeout
+	}
+
 	manager := &ClientManager{
 		clients: make(map[string]Client),
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: timeout,
 		},
 	}
 
@@ -75,8 +111,8 @@ func NewClientManager(appConfig *config.AppConfig) (*ClientManager, error) {
 		return nil, fmt.Errorf("failed to register clients from config: %w", err)
 	}
 
-	// Register Bitcoin client (still hardcoded)
-	if err := manager.registerBitcoinClient(); err != nil {
+	// Register Bitcoin client (not EVM, so it is not part of the EVM chain list)
+	if err := manager.registerBitcoinClient(appConfig.Chains.BitcoinRPCURL); err != nil {
 		return nil, fmt.Errorf("failed to register Bitcoin client: %w", err)
 	}
 
@@ -89,7 +125,7 @@ func NewClientManagerLegacy() (*ClientManager, error) {
 	manager := &ClientManager{
 		clients: make(map[string]Client),
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultRequestTimeout,
 		},
 	}
 
@@ -118,16 +154,17 @@ func (cm *ClientManager) registerClientsFromConfig(chainsConfig config.ChainsCon
 	return nil
 }
 
-// registerBitcoinClient registers the Bitcoin client
-func (cm *ClientManager) registerBitcoinClient() error {
-	chainInfo, err := GetChainInfo("bitcoin")
-	if err != nil {
-		return fmt.Errorf("failed to get Bitcoin chain info: %w", err)
+// registerBitcoinClient registers the Bitcoin client using rpcURL, or the registry default when empty.
+func (cm *ClientManager) registerBitcoinClient(rpcURL string) error {
+	if rpcURL == "" {
+		chainInfo, err := GetChainInfo("bitcoin")
+		if err != nil {
+			return fmt.Errorf("failed to get Bitcoin chain info: %w", err)
+		}
+		rpcURL = chainInfo.DefaultRPC
 	}
 
-	client := NewBitcoinClient(chainInfo.DefaultRPC, cm.httpClient)
-
-	return cm.RegisterClient(client)
+	return cm.RegisterClient(NewBitcoinClient(rpcURL, cm.httpClient))
 }
 
 // registerDefaultClients registers the default supported blockchain clients
@@ -187,13 +224,13 @@ func (cm *ClientManager) GetClient(chain string) (Client, error) {
 
 	// Check if the chain is supported in our registry
 	if !IsChainSupported(chain) {
-		return nil, ErrChainNotSupported
+		return nil, &UnsupportedChainError{Chain: chain}
 	}
 
 	// Check if we have a client implementation
 	client, exists := cm.clients[chain]
 	if !exists {
-		return nil, ErrChainNotSupported
+		return nil, &UnsupportedChainError{Chain: chain}
 	}
 
 	return client, nil
@@ -223,44 +260,52 @@ func (cm *ClientManager) Execute(ctx context.Context, chain, method string, para
 	return client.Execute(ctx, method, params)
 }
 
-// BatchExecute executes multiple RPC requests, potentially across different blockchains
+// BatchExecute executes multiple RPC requests, potentially across different blockchains.
+// Every chain is resolved before any upstream call, so an unsupported chain fails the whole batch
+// with an error matching ErrChainNotSupported. Afterwards each request yields one response in
+// order: node RPC errors keep their code and data, other failures carry a generic message, and
+// once ctx is done the remaining requests are answered without contacting the node.
 func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][]RPCRequest) (map[string][]RPCResponse, error) {
-	results := make(map[string][]RPCResponse)
+	chains := make([]string, 0, len(requests))
+	for chain := range requests {
+		chains = append(chains, chain)
+	}
+	sort.Strings(chains)
+
+	clients := make(map[string]Client, len(chains))
+	for _, chain := range chains {
+		client, err := cm.GetClient(chain)
+		if err != nil {
+			return nil, fmt.Errorf("chain %s: %w", chain, err)
+		}
+		clients[chain] = client
+	}
+
+	results := make(map[string][]RPCResponse, len(chains))
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	var errors []error
 
-	for chain, chainRequests := range requests {
+	for _, chain := range chains {
 		wg.Add(1)
-		go func(chain string, reqs []RPCRequest) {
+		go func(chain string, client Client, reqs []RPCRequest) {
 			defer wg.Done()
-
-			client, err := cm.GetClient(chain)
-			if err != nil {
-				mu.Lock()
-				errors = append(errors, fmt.Errorf("chain %s: %w", chain, err))
-				mu.Unlock()
-				return
-			}
 
 			responses := make([]RPCResponse, len(reqs))
 			for i, req := range reqs {
-				result, err := client.Execute(ctx, req.Method, req.Params)
-
-				// Create response
 				response := RPCResponse{
 					JSONRPC: "2.0",
 					ID:      req.ID,
 				}
 
+				var err error
+				var result json.RawMessage
+				if err = ctx.Err(); err == nil {
+					result, err = client.Execute(ctx, req.Method, req.Params)
+				}
+
 				if err != nil {
-					// Handle error
-					response.Error = &RPCError{
-						Code:    -32000,
-						Message: err.Error(),
-					}
+					response.Error = batchRPCError(err)
 				} else {
-					// Set result
 					response.Result = result
 				}
 
@@ -270,14 +315,27 @@ func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][
 			mu.Lock()
 			results[chain] = responses
 			mu.Unlock()
-		}(chain, chainRequests)
+		}(chain, clients[chain], requests[chain])
 	}
 
 	wg.Wait()
 
-	if len(errors) > 0 {
-		return results, fmt.Errorf("batch execution had %d errors: %v", len(errors), errors[0])
-	}
-
 	return results, nil
+}
+
+// batchRPCError converts an execution error into the JSON-RPC error returned to the caller.
+// Node-reported errors pass through unchanged; anything else gets a fixed message so transport
+// details (URLs, upstream bodies) are never exposed.
+func batchRPCError(err error) *RPCError {
+	var rpcErr *RPCError
+	switch {
+	case errors.As(err, &rpcErr):
+		return &RPCError{Code: rpcErr.Code, Message: rpcErr.Message, Data: rpcErr.Data}
+	case IsTimeout(err):
+		return &RPCError{Code: -32000, Message: "upstream request timed out"}
+	case errors.Is(err, context.Canceled):
+		return &RPCError{Code: -32000, Message: "request canceled"}
+	default:
+		return &RPCError{Code: -32000, Message: "upstream request failed"}
+	}
 }

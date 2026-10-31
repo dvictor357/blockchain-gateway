@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /blockchain-gateway ./cmd/server
 FROM golang:1.25.5-alpine AS development
 
 # Install Air for live reload and necessary tools
-RUN go install github.com/cosmtrek/air@latest && \
+RUN go install github.com/air-verse/air@v1.63.0 && \
     apk add --no-cache git make
 
 # Set working directory
@@ -56,8 +56,9 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /blockchain-gateway .
 
-# Copy config files if needed
-COPY .env* ./
+# Database migrations are applied at startup. Configuration (including any .env values)
+# is supplied at runtime via environment variables and is never baked into the image.
+COPY --from=builder /app/migrations ./migrations
 
 # Create a non-root user and switch to it
 RUN adduser -D -g '' appuser && \

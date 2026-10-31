@@ -13,7 +13,7 @@ import (
 
 func TestRouterLimitsUnknownRoutes(t *testing.T) {
 	logger := log.New(io.Discard, "", 0)
-	router := NewRouter(NewHandler(nil, logger, nil), logger, config.ServerConfig{RateLimit: 1})
+	router := NewRouter(NewHandler(nil, logger, nil, config.NewAPIConfig()), logger, config.ServerConfig{RateLimit: 1})
 
 	missing := httptest.NewRecorder()
 	router.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/api/v1/missing", nil))

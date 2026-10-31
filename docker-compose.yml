@@ -1,8 +1,41 @@
 version: '3.8'
 
+# Invocations (each starts PostgreSQL and waits for it to be healthy):
+#   docker-compose up blockchain-gateway-dev        # hot-reload development service
+#   docker-compose up blockchain-gateway-prod       # production-like service on :8081
+#   docker-compose --profile dev up                 # same as the first, via profile
+#   docker-compose --profile prod up                # same as the second, via profile
+# A bare `docker-compose up` starts only PostgreSQL, so two background market-data
+# fetchers are never started against one database by accident.
+#
+# Database settings come from the environment (or a project-level .env file read by Compose).
+# The defaults below are for LOCAL DEVELOPMENT ONLY: set DB_USER, DB_PASSWORD and DB_NAME
+# to your own values for anything else. PostgreSQL applies them only when the data volume is
+# first created; changing them later requires a new volume.
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: blockchain-gateway-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-gateway}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gateway-dev-password-change-me}
+      POSTGRES_DB: ${DB_NAME:-blockchain_gateway}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - blockchain-network
+    restart: unless-stopped
+
   # Development service with hot-reloading
   blockchain-gateway-dev:
+    profiles: ["dev"]
     build:
       context: .
       target: development
@@ -12,36 +45,58 @@ services:
       - go-modules:/go/pkg/mod
     ports:
       - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       - APP_MODE=debug
       - PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-gateway}
+      - DB_PASSWORD=${DB_PASSWORD:-gateway-dev-password-change-me}
+      - DB_NAME=${DB_NAME:-blockchain_gateway}
+      - DB_SSLMODE=disable
       - ETH_RPC_URL=https://ethereum.publicnode.com
       - BTC_RPC_URL=https://btc.getblock.io/mainnet
       - LOG_LEVEL=debug
       - REQUEST_TIMEOUT=30
+      - MARKET_FETCHER_ENABLED=${MARKET_FETCHER_ENABLED:-true}
     networks:
       - blockchain-network
     restart: unless-stopped
 
   # Production service
   blockchain-gateway-prod:
+    profiles: ["prod"]
     build:
       context: .
       target: production
     container_name: blockchain-gateway-prod
     ports:
       - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       - APP_MODE=release
       - PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-gateway}
+      - DB_PASSWORD=${DB_PASSWORD:-gateway-dev-password-change-me}
+      - DB_NAME=${DB_NAME:-blockchain_gateway}
+      - DB_SSLMODE=disable
       - ETH_RPC_URL=https://ethereum.publicnode.com
       - BTC_RPC_URL=https://btc.getblock.io/mainnet
       - LOG_LEVEL=info
       - REQUEST_TIMEOUT=30
+      - MARKET_FETCHER_ENABLED=${MARKET_FETCHER_ENABLED:-true}
     networks:
       - blockchain-network
     restart: unless-stopped
-    # Uncomment for production deployment
+    # Uncomment for production deployment. Run the market-data fetcher on ONE replica only
+    # and set MARKET_FETCHER_ENABLED=false on the others.
     # deploy:
     #   replicas: 2
     #   update_config:
@@ -56,4 +111,6 @@ networks:
 
 volumes:
   go-modules:
+    driver: local
+  postgres-data:
     driver: local

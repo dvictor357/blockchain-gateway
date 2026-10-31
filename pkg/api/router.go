@@ -82,7 +82,7 @@ func NewRouter(handler *Handler, logger *log.Logger, serverConfig config.ServerC
 
 // healthCheckHandler handles health check requests.
 // @Summary      Health Check
-// @Description  Check if the API is running and healthy
+// @Description  Liveness only: checks that the API process serves HTTP, not database or upstream readiness.
 // @Tags         health
 // @Accept       json
 // @Produce      json

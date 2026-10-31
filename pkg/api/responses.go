@@ -76,11 +76,12 @@ type SwaggerRPCResponse struct {
 	ID      int       `json:"id" example:"1"`
 }
 
-// RPCError represents a JSON-RPC error for Swagger documentation
+// RPCError represents a JSON-RPC error for Swagger documentation. Data is any JSON value
+// supplied by the node and is passed through unchanged.
 type RPCError struct {
-	Code    int    `json:"code" example:"-32000"`
-	Message string `json:"message" example:"Server error"`
-	Data    string `json:"data,omitempty" example:"Additional error details"`
+	Code    int         `json:"code" example:"-32000"`
+	Message string      `json:"message" example:"Server error"`
+	Data    interface{} `json:"data,omitempty" swaggertype:"object"`
 }
 
 // SwaggerBalance represents a balance response for Swagger documentation
