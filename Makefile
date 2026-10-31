@@ -51,7 +51,7 @@ dev:
 # Install Air for development
 install-air:
 	@echo "Installing Air..."
-	@go install github.com/air-verse/air@latest
+	@go install github.com/air-verse/air@v1.63.0
 
 # Install all development tools
 install-tools: install-air

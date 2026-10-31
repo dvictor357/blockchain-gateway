@@ -10,36 +10,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dvictor357/blaze"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/dvictor357/blockchain-gateway/pkg/models"
-	"github.com/dvictor357/blockchain-gateway/pkg/validation"
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-// Interfaces for testing
-type ClientManagerInterface interface {
-	ListChains() []string
-	Execute(ctx context.Context, chain, method string, params interface{}) (json.RawMessage, error)
-	BatchExecute(ctx context.Context, requests map[string][]blockchain.RPCRequest) (map[string][]blockchain.RPCResponse, error)
-	GetBalance(ctx context.Context, chain, address string) (*blockchain.Balance, error)
-	GetLatestBlock(ctx context.Context, chain string) (*blockchain.BlockInfo, error)
-	GetTransaction(ctx context.Context, chain, txHash string) (*blockchain.TransactionInfo, error)
-	GetGasPrice(ctx context.Context, chain string) (*big.Int, error)
-	GetTransactionCount(ctx context.Context, chain, address string) (uint64, error)
-}
-
-type MarketDataServiceInterface interface {
-	GetMarketDataFromDB(ctx context.Context, limit int, offset int, orderBy string, sortDirection string) ([]models.CoinMarket, int, time.Time, error)
-}
 
 // Mock implementations for testing
 type MockClientManager struct {
@@ -119,331 +101,26 @@ func (m *MockMarketDataService) GetMarketDataFromDB(ctx context.Context, limit i
 	return args.Get(0).([]models.CoinMarket), args.Get(1).(int), args.Get(2).(time.Time), nil
 }
 
-// TestableHandler is a standalone handler for testing that doesn't embed Handler
-type TestableHandler struct {
-	clientManager     ClientManagerInterface
-	marketDataService MarketDataServiceInterface
-	validator         *validation.Validator
-	errorHandler      *ErrorHandler
-	apiConfig         *config.APIConfig
-}
-
-func NewTestableHandler(clientManager ClientManagerInterface, logger *log.Logger, marketService MarketDataServiceInterface) *TestableHandler {
-	return &TestableHandler{
-		clientManager:     clientManager,
-		marketDataService: marketService,
-		validator:         validation.NewValidator(),
-		errorHandler:      NewErrorHandler(logger),
-		apiConfig:         config.NewAPIConfig(),
-	}
-}
-
-// Override methods to use the mocked interfaces
-func (h *TestableHandler) ListChains(c *gin.Context) {
-	chains := h.clientManager.ListChains()
-
-	c.JSON(http.StatusOK, ChainsResponse{
-		Chains: chains,
-		Count:  len(chains),
-	})
-}
-
-func (h *TestableHandler) QueryChain(c *gin.Context) {
-	chain := c.Param("chain")
-
-	// Validate chain name
-	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
-	}
-
-	// Parse the request body
-	var request blockchain.RPCRequest
-	if err := c.ShouldBindJSON(&request); err != nil {
-		h.errorHandler.HandleBindingError(c, err)
-		return
-	}
-
-	// Validate RPC request
-	if validationErrors := h.validator.ValidateRPCRequest(request.Method, request.Params); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
-	defer cancel()
-
-	// Execute the RPC request
-	result, err := h.clientManager.Execute(ctx, chain, request.Method, request.Params)
-	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "execute RPC request", chain)
-		return
-	}
-
-	// Create a JSON-RPC response
-	response := blockchain.RPCResponse{
-		JSONRPC: "2.0",
-		Result:  result,
-		ID:      request.ID,
-	}
-
-	c.JSON(http.StatusOK, response)
-}
-
-func (h *TestableHandler) BatchQuery(c *gin.Context) {
-	// Parse the request body
-	var batchRequest map[string][]blockchain.RPCRequest
-	if err := c.ShouldBindJSON(&batchRequest); err != nil {
-		h.errorHandler.HandleBindingError(c, err)
-		return
-	}
-
-	// Validate the request
-	if len(batchRequest) == 0 {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "EMPTY_BATCH",
-			"Batch request must include at least one blockchain")
-		return
-	}
-
-	if len(batchRequest) > h.apiConfig.MaxBatchSize {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "BATCH_TOO_LARGE",
-			"Batch size cannot exceed %d blockchains", h.apiConfig.MaxBatchSize)
-		return
-	}
-
-	// Validate each chain and request
-	for chain, requests := range batchRequest {
-		if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-			h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-			return
-		}
-
-		for _, req := range requests {
-			if validationErrors := h.validator.ValidateRPCRequest(req.Method, req.Params); validationErrors.HasErrors() {
-				h.errorHandler.HandleValidationErrors(c, validationErrors)
-				return
-			}
-		}
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("batch"))
-	defer cancel()
-
-	// Execute batch request
-	results, err := h.clientManager.BatchExecute(ctx, batchRequest)
-	if err != nil {
-		h.errorHandler.HandleGenericError(c, err, "execute batch request")
-		return
-	}
-
-	c.JSON(http.StatusOK, results)
-}
-
-func (h *TestableHandler) GetBalance(c *gin.Context) {
-	chain := c.Param("chain")
-	address := c.Param("address")
-
-	// Validate chain and address together
-	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
-	defer cancel()
-
-	// Get balance
-	balance, err := h.clientManager.GetBalance(ctx, chain, address)
-	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get balance", chain)
-		return
-	}
-
-	c.JSON(http.StatusOK, balance)
-}
-
-func (h *TestableHandler) GetLatestBlock(c *gin.Context) {
-	chain := c.Param("chain")
-
-	// Validate chain name
-	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
-	defer cancel()
-
-	// Get latest block
-	block, err := h.clientManager.GetLatestBlock(ctx, chain)
-	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get latest block", chain)
-		return
-	}
-
-	c.JSON(http.StatusOK, block)
-}
-
-func (h *TestableHandler) GetTransaction(c *gin.Context) {
-	chain := c.Param("chain")
-	hash := c.Param("hash")
-
-	// Validate chain and hash together
-	if validationErrors := h.validator.ValidateChainAndHash(chain, hash); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
-	defer cancel()
-
-	// Get transaction
-	tx, err := h.clientManager.GetTransaction(ctx, chain, hash)
-	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get transaction", chain)
-		return
-	}
-
-	c.JSON(http.StatusOK, tx)
-}
-
-func (h *TestableHandler) GetGasPrice(c *gin.Context) {
-	chain := c.Param("chain")
-
-	// Validate chain name
-	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
-	defer cancel()
-
-	// Get gas price
-	gasPrice, err := h.clientManager.GetGasPrice(ctx, chain)
-	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get gas price", chain)
-		return
-	}
-
-	// Format the response
-	c.JSON(http.StatusOK, GasPriceResponse{
-		Chain:       chain,
-		GasPrice:    gasPrice.String(),
-		GasPriceHex: fmt.Sprintf("0x%x", gasPrice),
-	})
-}
-
-func (h *TestableHandler) GetTransactionCount(c *gin.Context) {
-	chain := c.Param("chain")
-	address := c.Param("address")
-
-	// Validate chain and address together
-	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
-	}
-
-	// Create a context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), h.apiConfig.GetTimeout("default"))
-	defer cancel()
-
-	// Get transaction count
-	count, err := h.clientManager.GetTransactionCount(ctx, chain, address)
-	if err != nil {
-		h.errorHandler.HandleBlockchainError(c, err, "get transaction count", chain)
-		return
-	}
-
-	// Format the response
-	c.JSON(http.StatusOK, TransactionCountResponse{
-		Chain:            chain,
-		Address:          address,
-		TransactionCount: count,
-		Nonce:            fmt.Sprintf("0x%x", count),
-	})
-}
-
-func (h *TestableHandler) GetCoinMarkets(c *gin.Context) {
-	// Parse and validate pagination parameters
-	limitStr := c.DefaultQuery("limit", strconv.Itoa(h.apiConfig.DefaultPageLimit))
-	offsetStr := c.DefaultQuery("offset", "0")
-	orderBy := c.DefaultQuery("orderBy", "market_cap_rank")
-	sortDirection := c.DefaultQuery("sortDirection", "asc")
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_LIMIT",
-			"Invalid limit parameter")
-		return
-	}
-
-	offset, err := strconv.Atoi(offsetStr)
-	if err != nil {
-		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "INVALID_OFFSET",
-			"Invalid offset parameter")
-		return
-	}
-
-	// Validate pagination parameters
-	if validationErrors := h.validator.ValidatePaginationParams(limit, offset); validationErrors.HasErrors() {
-		h.errorHandler.HandleValidationErrors(c, validationErrors)
-		return
-	}
-
-	// Validate and normalize limit
-	limit = h.apiConfig.ValidatePageLimit(limit)
-
-	// Validate orderBy field
-	if validationErr := h.validator.ValidateOrderBy(orderBy, h.apiConfig.AllowedOrderByFields); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
-	}
-
-	// Validate sort direction
-	if validationErr := h.validator.ValidateSortDirection(sortDirection); validationErr.Message != "" {
-		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-		return
-	}
-
-	// Fetch market data
-	markets, total, latestFetchTime, err := h.marketDataService.GetMarketDataFromDB(c.Request.Context(), limit, offset, orderBy, sortDirection)
-	if err != nil {
-		h.errorHandler.HandleGenericError(c, err, "retrieve market data")
-		return
-	}
-
-	c.JSON(http.StatusOK, MarketDataResponse{
-		Data: markets,
-		Pagination: PaginationInfo{
-			TotalRecords: total,
-			Limit:        limit,
-			Offset:       offset,
-			CurrentPage:  (offset / limit) + 1,
-			TotalPages:   (total + limit - 1) / limit,
-		},
-		Meta: MetaInfo{
-			LastDataUpdateFromSource: latestFetchTime.Format(time.RFC3339Nano),
-		},
-	})
-}
-
-func setupTestHandler() (*TestableHandler, *MockClientManager, *MockMarketDataService) {
-	gin.SetMode(gin.TestMode)
-
+func setupTestHandler() (*Handler, *MockClientManager, *MockMarketDataService) {
 	mockClientManager := &MockClientManager{}
 	mockMarketService := &MockMarketDataService{}
 	logger := log.New(os.Stdout, "test", log.LstdFlags)
 
-	handler := NewTestableHandler(mockClientManager, logger, mockMarketService)
+	handler := NewHandler(mockClientManager, logger, mockMarketService, config.NewAPIConfig())
 
 	return handler, mockClientManager, mockMarketService
+}
+
+func serveHandler(method, route, target, body string, handler blaze.HandlerFunc) *httptest.ResponseRecorder {
+	router := blaze.New()
+	router.Handle(method, route, handler)
+	request := httptest.NewRequest(method, target, strings.NewReader(body))
+	if body != "" {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	writer := httptest.NewRecorder()
+	router.ServeHTTP(writer, request)
+	return writer
 }
 
 func TestHandler_ListChains(t *testing.T) {
@@ -473,10 +150,7 @@ func TestHandler_ListChains(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClientManager.On("ListChains").Return(tt.mockChains).Once()
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-
-			handler.ListChains(c)
+			w := serveHandler(http.MethodGet, "/chains", "/chains", "", handler.ListChains)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			assert.JSONEq(t, tt.expectedBody, w.Body.String())
@@ -536,13 +210,8 @@ func TestHandler_QueryChain(t *testing.T) {
 				mockClientManager.On("Execute", mock.Anything, tt.chain, "eth_blockNumber", []interface{}{}).Return(tt.mockResult, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Params = gin.Params{{Key: "chain", Value: tt.chain}}
-			c.Request = httptest.NewRequest("POST", "/", strings.NewReader(tt.requestBody))
-			c.Request.Header.Set("Content-Type", "application/json")
-
-			handler.QueryChain(c)
+			w := serveHandler(http.MethodPost, "/chains/:chain/query",
+				"/chains/"+tt.chain+"/query", tt.requestBody, handler.QueryChain)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -592,7 +261,7 @@ func TestHandler_BatchQuery(t *testing.T) {
 			name:           "empty batch request",
 			requestBody:    `{}`,
 			expectedStatus: http.StatusBadRequest,
-			expectedBody:   `{"error":"Batch request must include at least one blockchain","code":"EMPTY_BATCH"}`,
+			expectedBody:   `{"error":"Batch request must include at least one RPC request","code":"EMPTY_BATCH"}`,
 		},
 		{
 			name:           "invalid JSON",
@@ -608,12 +277,7 @@ func TestHandler_BatchQuery(t *testing.T) {
 				mockClientManager.On("BatchExecute", mock.Anything, mock.Anything).Return(tt.mockResult, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("POST", "/", strings.NewReader(tt.requestBody))
-			c.Request.Header.Set("Content-Type", "application/json")
-
-			handler.BatchQuery(c)
+			w := serveHandler(http.MethodPost, "/batch", "/batch", tt.requestBody, handler.BatchQuery)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -672,15 +336,8 @@ func TestHandler_GetBalance(t *testing.T) {
 				mockClientManager.On("GetBalance", mock.Anything, tt.chain, tt.address).Return(tt.mockBalance, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("GET", "/", nil)
-			c.Params = gin.Params{
-				{Key: "chain", Value: tt.chain},
-				{Key: "address", Value: tt.address},
-			}
-
-			handler.GetBalance(c)
+			w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+				"/chains/"+tt.chain+"/address/"+tt.address+"/balance", "", handler.GetBalance)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -724,7 +381,7 @@ func TestHandler_GetLatestBlock(t *testing.T) {
 		{
 			name:           "blockchain error",
 			chain:          "ethereum",
-			mockError:      errors.New("block not found"),
+			mockError:      fmt.Errorf("%w: block", blockchain.ErrNotFound),
 			expectedStatus: http.StatusNotFound,
 		},
 	}
@@ -735,12 +392,8 @@ func TestHandler_GetLatestBlock(t *testing.T) {
 				mockClientManager.On("GetLatestBlock", mock.Anything, tt.chain).Return(tt.mockBlock, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("GET", "/", nil)
-			c.Params = gin.Params{{Key: "chain", Value: tt.chain}}
-
-			handler.GetLatestBlock(c)
+			w := serveHandler(http.MethodGet, "/chains/:chain/block/latest",
+				"/chains/"+tt.chain+"/block/latest", "", handler.GetLatestBlock)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -790,7 +443,7 @@ func TestHandler_GetTransaction(t *testing.T) {
 			name:           "transaction not found",
 			chain:          "ethereum",
 			hash:           "0x9c46f98547a5bf8e785e0e77472b3ca8fb5cdb9279fbc443637f781a3e9bff71",
-			mockError:      errors.New("transaction not found"),
+			mockError:      fmt.Errorf("%w: transaction", blockchain.ErrNotFound),
 			expectedStatus: http.StatusNotFound,
 		},
 	}
@@ -801,15 +454,8 @@ func TestHandler_GetTransaction(t *testing.T) {
 				mockClientManager.On("GetTransaction", mock.Anything, tt.chain, tt.hash).Return(tt.mockTx, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("GET", "/", nil)
-			c.Params = gin.Params{
-				{Key: "chain", Value: tt.chain},
-				{Key: "hash", Value: tt.hash},
-			}
-
-			handler.GetTransaction(c)
+			w := serveHandler(http.MethodGet, "/chains/:chain/tx/:hash",
+				"/chains/"+tt.chain+"/tx/"+tt.hash, "", handler.GetTransaction)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -846,7 +492,7 @@ func TestHandler_GetGasPrice(t *testing.T) {
 		{
 			name:           "operation not applicable",
 			chain:          "bitcoin",
-			mockError:      errors.New("operation not applicable for this blockchain"),
+			mockError:      fmt.Errorf("%w: gas price", blockchain.ErrNotApplicable),
 			expectedStatus: http.StatusBadRequest,
 		},
 	}
@@ -857,12 +503,8 @@ func TestHandler_GetGasPrice(t *testing.T) {
 				mockClientManager.On("GetGasPrice", mock.Anything, tt.chain).Return(tt.mockGasPrice, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("GET", "/", nil)
-			c.Params = gin.Params{{Key: "chain", Value: tt.chain}}
-
-			handler.GetGasPrice(c)
+			w := serveHandler(http.MethodGet, "/chains/:chain/gas-price",
+				"/chains/"+tt.chain+"/gas-price", "", handler.GetGasPrice)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -914,15 +556,8 @@ func TestHandler_GetTransactionCount(t *testing.T) {
 				mockClientManager.On("GetTransactionCount", mock.Anything, tt.chain, tt.address).Return(tt.mockCount, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("GET", "/", nil)
-			c.Params = gin.Params{
-				{Key: "chain", Value: tt.chain},
-				{Key: "address", Value: tt.address},
-			}
-
-			handler.GetTransactionCount(c)
+			w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/nonce",
+				"/chains/"+tt.chain+"/address/"+tt.address+"/nonce", "", handler.GetTransactionCount)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -979,6 +614,18 @@ func TestHandler_GetCoinMarkets(t *testing.T) {
 			expectedBody:   `{"error":"Invalid offset parameter","code":"INVALID_OFFSET"}`,
 		},
 		{
+			name:           "explicit empty limit parameter",
+			queryParams:    "?limit=",
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `{"error":"Invalid limit parameter","code":"INVALID_LIMIT"}`,
+		},
+		{
+			name:           "explicit empty offset parameter",
+			queryParams:    "?offset=",
+			expectedStatus: http.StatusBadRequest,
+			expectedBody:   `{"error":"Invalid offset parameter","code":"INVALID_OFFSET"}`,
+		},
+		{
 			name:           "service error",
 			queryParams:    "?limit=10&offset=0",
 			mockError:      errors.New("database connection failed"),
@@ -992,11 +639,7 @@ func TestHandler_GetCoinMarkets(t *testing.T) {
 				mockMarketService.On("GetMarketDataFromDB", mock.Anything, mock.AnythingOfType("int"), mock.AnythingOfType("int"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(tt.mockMarkets, tt.mockTotal, tt.mockTime, tt.mockError).Once()
 			}
 
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest("GET", "/markets"+tt.queryParams, nil)
-
-			handler.GetCoinMarkets(c)
+			w := serveHandler(http.MethodGet, "/markets", "/markets"+tt.queryParams, "", handler.GetCoinMarkets)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 			if tt.expectedBody != "" {
@@ -1013,15 +656,8 @@ func TestHandler_Integration(t *testing.T) {
 
 	// Test that validation, error handling, and client manager integration works
 	t.Run("validation and error handling integration", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("GET", "/", nil)
-		c.Params = gin.Params{
-			{Key: "chain", Value: "invalid@chain"},
-			{Key: "address", Value: "invalid_address"},
-		}
-
-		handler.GetBalance(c)
+		w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+			"/chains/invalid@chain/address/invalid_address/balance", "", handler.GetBalance)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
@@ -1033,23 +669,91 @@ func TestHandler_Integration(t *testing.T) {
 		assert.NotEmpty(t, response.Details)
 	})
 
-	// Test timeout configuration integration
-	t.Run("timeout configuration integration", func(t *testing.T) {
-		// This test verifies that the handler uses the configured timeouts
-		// In a real scenario, we would test with a slow mock that times out
+	t.Run("request deadline error response", func(t *testing.T) {
 		mockClientManager.On("GetBalance", mock.Anything, "ethereum", "0x742d35Cc6634C0532925a3b844Bc454e4438f44e").Return(nil, context.DeadlineExceeded).Once()
 
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
-		c.Request = httptest.NewRequest("GET", "/", nil)
-		c.Params = gin.Params{
-			{Key: "chain", Value: "ethereum"},
-			{Key: "address", Value: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"},
-		}
+		w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+			"/chains/ethereum/address/0x742d35Cc6634C0532925a3b844Bc454e4438f44e/balance", "", handler.GetBalance)
 
-		handler.GetBalance(c)
-
-		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Equal(t, http.StatusGatewayTimeout, w.Code)
+		assert.JSONEq(t, `{"error":"RPC request timed out","code":"RPC_TIMEOUT"}`, w.Body.String())
 		mockClientManager.AssertExpectations(t)
 	})
+}
+
+func TestHandler_RPCNumericFidelity(t *testing.T) {
+	const numericParams = `[9007199254740993,0.12345678901234567890123456789,{"value":18446744073709551615}]`
+	params := []interface{}{
+		json.Number("9007199254740993"),
+		json.Number("0.12345678901234567890123456789"),
+		map[string]interface{}{"value": json.Number("18446744073709551615")},
+	}
+	id := json.Number("9007199254740993")
+	requestBody := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_call","params":%s,"id":%s}`, numericParams, id)
+
+	for _, batch := range []bool{false, true} {
+		t.Run(fmt.Sprintf("batch=%t", batch), func(t *testing.T) {
+			handler, manager, _ := setupTestHandler()
+			var w *httptest.ResponseRecorder
+			if batch {
+				requests := map[string][]blockchain.RPCRequest{
+					"ethereum": {{JSONRPC: "2.0", Method: "eth_call", Params: params, ID: id}},
+				}
+				responses := map[string][]blockchain.RPCResponse{
+					"ethereum": {{JSONRPC: "2.0", Result: json.RawMessage(numericParams), ID: id}},
+				}
+				manager.On("BatchExecute", mock.Anything, requests).Return(responses, nil).Once()
+				w = serveHandler(http.MethodPost, "/batch", "/batch",
+					`{"ethereum":[`+requestBody+`]}`, handler.BatchQuery)
+			} else {
+				manager.On("Execute", mock.Anything, "ethereum", "eth_call", params).
+					Return(json.RawMessage(numericParams), nil).Once()
+				w = serveHandler(http.MethodPost, "/chains/:chain/query", "/chains/ethereum/query",
+					requestBody, handler.QueryChain)
+			}
+
+			require.Equal(t, http.StatusOK, w.Code)
+			decoder := json.NewDecoder(w.Body)
+			decoder.UseNumber()
+			var response blockchain.RPCResponse
+			if batch {
+				var responses map[string][]blockchain.RPCResponse
+				require.NoError(t, decoder.Decode(&responses))
+				require.Len(t, responses["ethereum"], 1)
+				response = responses["ethereum"][0]
+			} else {
+				require.NoError(t, decoder.Decode(&response))
+			}
+			assert.Equal(t, id, response.ID)
+			assert.Equal(t, numericParams, string(response.Result))
+			manager.AssertExpectations(t)
+		})
+	}
+}
+
+func TestHandler_GetCoinMarkets_QueryDefaults(t *testing.T) {
+	tests := []struct {
+		name          string
+		query         string
+		orderBy       string
+		sortDirection string
+	}{
+		{name: "missing query values", orderBy: "market_cap_rank", sortDirection: "asc"},
+		{name: "explicit empty ordering", query: "?orderBy=&sortDirection="},
+		{name: "first query value remains empty", query: "?orderBy=&orderBy=price&sortDirection=&sortDirection=desc"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			handler, _, marketService := setupTestHandler()
+			marketService.On("GetMarketDataFromDB", mock.Anything, handler.apiConfig.DefaultPageLimit,
+				0, tt.orderBy, tt.sortDirection).
+				Return([]models.CoinMarket{}, 0, time.Time{}, nil).Once()
+
+			w := serveHandler(http.MethodGet, "/markets", "/markets"+tt.query, "", handler.GetCoinMarkets)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			marketService.AssertExpectations(t)
+		})
+	}
 }

@@ -1,17 +1,24 @@
 package config
 
 import (
+	"fmt"
+	"math"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Constants for default values
 const (
 	defaultPort           = "8080"
 	defaultHost           = "0.0.0.0"
-	defaultGinMode        = "release"
+	defaultAppMode        = "release"
 	defaultLogLevel       = "info"
-	defaultRequestTimeout = 30
+	defaultRequestTimeout = 30 * time.Second
+
+	// Accepted REQUEST_TIMEOUT range, in whole seconds.
+	minRequestTimeoutSeconds = 1
+	maxRequestTimeoutSeconds = 120
 
 	defaultDBHost     = "localhost"
 	defaultDBPort     = "5432"
@@ -32,9 +39,11 @@ const (
 type ServerConfig struct {
 	Port      string
 	Host      string
-	GinMode   string
+	Mode      string
 	RateLimit int
-	// RequestTimeout time.Duration // For http.Server, if needed directly here
+	// RequestTimeout is the per-request budget and upstream HTTP client timeout (REQUEST_TIMEOUT).
+	// Zero means the configured value was not a usable number; AppConfig.Validate rejects it.
+	RequestTimeout time.Duration
 }
 
 // DatabaseConfig holds database connection parameters
@@ -53,6 +62,9 @@ type CoinGeckoConfig struct {
 	PerPage    int
 	Order      string
 	VsCurrency string
+	// FetcherEnabled controls the background market-data fetcher (MARKET_FETCHER_ENABLED).
+	// Only one fetcher should run against a database; disable it on additional replicas.
+	FetcherEnabled bool
 	// Add API Key if needed in future
 }
 
@@ -72,6 +84,9 @@ type ChainConfig struct {
 // ChainsConfig holds configuration for all supported blockchain networks
 type ChainsConfig struct {
 	EVMChains []ChainConfig `json:"evm_chains"`
+	// BitcoinRPCURL overrides the built-in Bitcoin RPC endpoint (BTC_RPC_URL); empty keeps the default.
+	// It may embed basic-auth credentials.
+	BitcoinRPCURL string `json:"-"`
 }
 
 // AppConfig holds all application configurations
@@ -90,8 +105,10 @@ func LoadConfig() *AppConfig {
 		Server: ServerConfig{
 			Port:      GetStringEnv("PORT", defaultPort),
 			Host:      defaultHost,
-			GinMode:   GetStringEnv("GIN_MODE", defaultGinMode),
+			Mode:      GetStringEnv("APP_MODE", defaultAppMode),
 			RateLimit: GetIntEnv("RATE_LIMIT", 120),
+
+			RequestTimeout: loadRequestTimeout(),
 		},
 		Database: DatabaseConfig{
 			Host:     GetStringEnv("DB_HOST", defaultDBHost),
@@ -106,6 +123,8 @@ func LoadConfig() *AppConfig {
 			PerPage:    GetIntEnv("COINGECKO_PER_PAGE", defaultCoinGeckoPerPage),
 			Order:      GetStringEnv("COINGECKO_ORDER", defaultCoinGeckoOrder),
 			VsCurrency: GetStringEnv("COINGECKO_VS_CURRENCY", defaultCoinGeckoVsCurrency),
+
+			FetcherEnabled: GetBoolEnv("MARKET_FETCHER_ENABLED", true),
 		},
 		Chains:        LoadChainsConfig(),
 		LogLevel:      GetStringEnv("LOG_LEVEL", defaultLogLevel),
@@ -114,9 +133,34 @@ func LoadConfig() *AppConfig {
 	return cfg
 }
 
+// Validate reports configuration values that cannot be used.
+func (c *AppConfig) Validate() error {
+	if c.Server.RequestTimeout < minRequestTimeoutSeconds*time.Second ||
+		c.Server.RequestTimeout > maxRequestTimeoutSeconds*time.Second {
+		return fmt.Errorf("REQUEST_TIMEOUT must be a whole number of seconds between %d and %d",
+			minRequestTimeoutSeconds, maxRequestTimeoutSeconds)
+	}
+	return nil
+}
+
+// loadRequestTimeout reads REQUEST_TIMEOUT (whole seconds). An unset variable yields the default;
+// an unparsable value yields zero so that Validate rejects it instead of silently using the default.
+func loadRequestTimeout() time.Duration {
+	raw := os.Getenv("REQUEST_TIMEOUT")
+	if raw == "" {
+		return defaultRequestTimeout
+	}
+	seconds, err := strconv.Atoi(raw)
+	if err != nil || seconds < 0 || seconds > math.MaxInt32 {
+		return 0
+	}
+	return time.Duration(seconds) * time.Second
+}
+
 // LoadChainsConfig loads blockchain network configurations
 func LoadChainsConfig() ChainsConfig {
 	return ChainsConfig{
+		BitcoinRPCURL: os.Getenv("BTC_RPC_URL"),
 		EVMChains: []ChainConfig{
 			// Ethereum - Original EVM chain
 			{

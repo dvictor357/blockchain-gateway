@@ -29,7 +29,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -37,28 +39,43 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/dvictor357/blockchain-gateway/docs"
 	"github.com/dvictor357/blockchain-gateway/pkg/api"
 	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
 	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
 	"github.com/dvictor357/blockchain-gateway/pkg/config"
 	"github.com/dvictor357/blockchain-gateway/pkg/database"
 	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
-	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+)
+
+const (
+	// responseWriteMargin is added to the longest handler budget to form the server write timeout.
+	responseWriteMargin = 10 * time.Second
+	shutdownTimeout     = 30 * time.Second
+	migrationTimeout    = 60 * time.Second
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	logger := log.New(os.Stdout, "[BLOCKCHAIN-GATEWAY] ", log.LstdFlags|log.Lshortfile)
+	if err := run(logger); err != nil {
+		logger.Fatalf("%v", err)
+	}
+}
+
+// run starts the service and blocks until shutdown. It returns only after the market worker
+// has stopped and the database is closed, so callers may exit the process afterwards.
+func run(logger *log.Logger) error {
+	// A .env file is optional: environment-only startup is supported. A file that exists but
+	// cannot be read or parsed is still an error.
+	if err := godotenv.Load(); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("error loading .env file: %w", err)
 	}
 
 	appConfig := config.LoadConfig()
+	if err := appConfig.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
 
-	logger := log.New(os.Stdout, "[BLOCKCHAIN-GATEWAY] ", log.LstdFlags|log.Lshortfile)
 	logger.Printf("Starting blockchain RPC gateway service with log level: %s...", appConfig.LogLevel)
 
 	startupMessage := `
@@ -80,20 +97,24 @@ func main() {
 		SSLMode:  appConfig.Database.SSLMode,
 	}
 
-	db, err := database.ConnectDB(dbConnectionCfg)
+	db, err := database.ConnectDB(context.Background(), dbConnectionCfg)
 	if err != nil {
-		logger.Fatalf("Failed to connect to database: %v", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
+	// Deferred first so it runs last: the market worker is stopped before the database closes.
 	defer db.Close()
 
-	if err := database.RunMigrations(db, appConfig.MigrationsDir); err != nil {
-		logger.Fatalf("Failed to run database migrations: %v", err)
+	migrationCtx, cancelMigration := context.WithTimeout(context.Background(), migrationTimeout)
+	err = database.RunMigrations(migrationCtx, db, appConfig.MigrationsDir)
+	cancelMigration()
+	if err != nil {
+		return fmt.Errorf("failed to run database migrations: %w", err)
 	}
 	logger.Println("Database migrations completed successfully.")
 
 	clientManager, err := blockchain.NewClientManager(appConfig)
 	if err != nil {
-		logger.Fatalf("Failed to initialize blockchain client manager: %v", err)
+		return fmt.Errorf("failed to initialize blockchain client manager: %w", err)
 	}
 
 	cgClient := coingecko.NewClient(nil, appConfig.CoinGecko.BaseURL)
@@ -109,105 +130,77 @@ func main() {
 	}
 	marketServ := marketdata.NewService(logger, cgClient, marketRepo, marketServiceConfig)
 
-	appCtx, cancelAppCtx := context.WithCancel(context.Background())
-	defer cancelAppCtx()
-
-	go marketServ.StartFetchingLoop(appCtx)
-
-	apiHandler := api.NewHandler(clientManager, logger, marketServ)
-
-	gin.SetMode(appConfig.Server.GinMode)
-	router := gin.New()
-	router.Use(gin.Recovery())
-	router.Use(api.LoggingMiddleware(logger))
-	router.Use(api.RateLimit(appConfig.Server.RateLimit))
-
-	router.GET("/health", healthCheckHandler)
-
-	// Swagger documentation endpoint
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	if gin.Mode() == gin.DebugMode {
-		router.Use(gin.Logger())
-		logger.Println("Running in development mode (debug) with enhanced logging")
-
-		router.GET("/debug/routes", func(c *gin.Context) {
-			routes := []string{}
-			for _, r := range router.Routes() {
-				routes = append(routes, fmt.Sprintf("%s %s", r.Method, r.Path))
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"routes": routes,
-				"count":  len(routes),
-				"mode":   gin.Mode(),
-			})
-		})
+	// The worker stops on every exit path, and its loop is awaited before the database closes.
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	workerDone := make(chan struct{})
+	if appConfig.CoinGecko.FetcherEnabled {
+		go func() {
+			defer close(workerDone)
+			marketServ.StartFetchingLoop(workerCtx)
+		}()
+	} else {
+		logger.Println("Market data fetcher disabled (MARKET_FETCHER_ENABLED=false); serving stored data only.")
+		close(workerDone)
 	}
+	defer func() {
+		cancelWorker()
+		<-workerDone
+	}()
 
-	apiV1 := router.Group("/api/v1")
-	{
-		apiV1.GET("/chains", apiHandler.ListChains)
-		apiV1.POST("/chains/:chain/query", apiHandler.QueryChain)
-		apiV1.POST("/batch", apiHandler.BatchQuery)
-		apiV1.GET("/chains/:chain/address/:address/balance", apiHandler.GetBalance)
-		apiV1.GET("/chains/:chain/block/latest", apiHandler.GetLatestBlock)
-		apiV1.GET("/chains/:chain/tx/:hash", apiHandler.GetTransaction)
-		apiV1.GET("/chains/:chain/gas-price", apiHandler.GetGasPrice)
-		apiV1.GET("/chains/:chain/address/:address/nonce", apiHandler.GetTransactionCount)
-		apiV1.GET("/markets", apiHandler.GetCoinMarkets)
-	}
+	apiConfig := config.NewAPIConfigFromServer(appConfig.Server)
+	apiHandler := api.NewHandler(clientManager, logger, marketServ, apiConfig)
+
+	router := api.NewRouter(apiHandler, logger, appConfig.Server)
 
 	addr := fmt.Sprintf("%s:%s", appConfig.Server.Host, appConfig.Server.Port)
 	readTimeout := 15 * time.Second
-	writeTimeout := 15 * time.Second
 	idleTimeout := 60 * time.Second
-	if gin.Mode() == gin.DebugMode {
+	if appConfig.Server.Mode == "debug" {
 		readTimeout = 30 * time.Second
-		writeTimeout = 30 * time.Second
 		idleTimeout = 120 * time.Second
 	}
 
 	server := &http.Server{
-		Addr:         addr,
-		Handler:      router,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       readTimeout,
+		// Must outlast the longest handler budget so a slow-but-successful response can still be written.
+		WriteTimeout: apiConfig.LongestTimeout() + responseWriteMargin,
 		IdleTimeout:  idleTimeout,
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		logger.Printf("Server listening on %s", addr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("Failed to start server: %v", err)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	logger.Println("Shutting down server...")
 
-	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 30*time.Second)
+	var runErr error
+	select {
+	case <-quit:
+		logger.Println("Shutting down server...")
+	case err := <-serverErr:
+		runErr = fmt.Errorf("server failed: %w", err)
+	}
+
+	// Stop the fetcher as draining begins; its deferred wait above completes before db.Close.
+	cancelWorker()
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancelShutdown()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Fatalf("Server forced to shutdown: %v", err)
+		logger.Printf("Server did not drain cleanly, closing connections: %v", err)
+		server.Close()
+	} else {
+		logger.Println("Server gracefully stopped")
 	}
 
-	logger.Println("Server gracefully stopped")
-}
-
-// healthCheckHandler handles health check requests
-// @Summary      Health Check
-// @Description  Check if the API is running and healthy
-// @Tags         health
-// @Accept       json
-// @Produce      json
-// @Success      200  {object}  api.HealthResponse
-// @Router       /health [get]
-func healthCheckHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, api.HealthResponse{
-		Status: "ok",
-		Time:   time.Now().Format(time.RFC3339),
-	})
+	return runErr
 }

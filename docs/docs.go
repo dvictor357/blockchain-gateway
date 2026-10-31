@@ -12,7 +12,7 @@ const docTemplate = `{
         "contact": {
             "name": "API Support",
             "url": "https://github.com/dvictor357/blockchain-gateway",
-            "email": "dvictor.3579@gmail.com"
+            "email": "support@example.com"
         },
         "license": {
             "name": "MIT",
@@ -25,7 +25,7 @@ const docTemplate = `{
     "paths": {
         "/api/v1/batch": {
             "post": {
-                "description": "Execute multiple RPC queries across different blockchain networks in a single request",
+                "description": "Execute multiple RPC queries across different blockchain networks in a single request.\nThe total number of RPC requests across all chains is limited (10 by default); requests on one chain run sequentially.\nPer-request node errors are returned inside the response with their original code and data.",
                 "consumes": [
                     "application/json"
                 ],
@@ -72,6 +72,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -112,7 +124,7 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/address/{address}/balance": {
             "get": {
-                "description": "Get the native token balance for a specific address on a blockchain",
+                "description": "Get the native token balance for a specific address on a blockchain.\nBitcoin is not supported (HTTP 501, code OPERATION_NOT_SUPPORTED): no address index is configured.",
                 "consumes": [
                     "application/json"
                 ],
@@ -165,6 +177,24 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -230,6 +260,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
                     }
                 }
             }
@@ -285,6 +327,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
                     }
                 }
             }
@@ -336,6 +390,18 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -398,8 +464,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
                     },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -471,6 +549,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
                     }
                 }
             }
@@ -506,12 +596,13 @@ const docTemplate = `{
                     {
                         "enum": [
                             "market_cap_rank",
-                            "price",
-                            "volume_24h",
-                            "price_change_percentage_24h"
+                            "name",
+                            "current_price",
+                            "last_updated",
+                            "data_fetched_at"
                         ],
                         "type": "string",
-                        "description": "Field to order by",
+                        "description": "Field to order by (case-insensitive)",
                         "name": "orderBy",
                         "in": "query",
                         "required": true
@@ -546,13 +637,19 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
                     }
                 }
             }
         },
         "/health": {
             "get": {
-                "description": "Check if the API is running and healthy",
+                "description": "Liveness only: checks that the API process serves HTTP, not database or upstream readiness.",
                 "consumes": [
                     "application/json"
                 ],
@@ -684,8 +781,7 @@ const docTemplate = `{
                     "example": -32000
                 },
                 "data": {
-                    "type": "string",
-                    "example": "Additional error details"
+                    "type": "object"
                 },
                 "message": {
                     "type": "string",

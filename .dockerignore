@@ -1,0 +1,30 @@
+# Secrets and local configuration: never part of the build context or any image layer
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Version control and CI metadata
+.git
+.github
+
+# Build outputs and local run artifacts
+/build/
+/bin/
+/tmp/
+/blockchain-gateway
+*.test
+*.out
+*.log
+logs/
+
+# Editor and tool state
+.idea/
+.vscode/
+.kiro/
+.windsurf/
+.claude/
+.opencode/
+.copilot/
+.factory/
+.DS_Store

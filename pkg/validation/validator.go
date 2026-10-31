@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
 )
 
 // Validator provides validation methods for API inputs
@@ -53,6 +55,29 @@ var bitcoinAddressRegex = regexp.MustCompile(`^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|
 // Transaction hash regex pattern
 var transactionHashRegex = regexp.MustCompile(`^0x[a-fA-F0-9]{64}$`)
 
+// Bitcoin transaction hashes are 64 hex characters without a 0x prefix
+var bitcoinTransactionHashRegex = regexp.MustCompile(`^[a-fA-F0-9]{64}$`)
+
+// Hash format for chains of unknown type: 64 hex characters, optionally 0x-prefixed
+var genericTransactionHashRegex = regexp.MustCompile(`^(0x)?[a-fA-F0-9]{64}$`)
+
+var chainNameRegex = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+
+var rpcMethodRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// chainType returns the registry type of a chain. Ethereum and polygon are treated as EVM
+// chains even before the registry has been loaded from configuration.
+func chainType(chain string) blockchain.ChainType {
+	if info, err := blockchain.GetChainInfo(chain); err == nil {
+		return info.Type
+	}
+	switch chain {
+	case "ethereum", "polygon":
+		return blockchain.ChainTypeEVM
+	}
+	return ""
+}
+
 // ValidateChainName validates a blockchain name
 func (v *Validator) ValidateChainName(chain string) ValidationError {
 	if chain == "" {
@@ -63,7 +88,7 @@ func (v *Validator) ValidateChainName(chain string) ValidationError {
 	chain = strings.ToLower(chain)
 
 	// Check if it's a valid chain name format
-	if !regexp.MustCompile(`^[a-z][a-z0-9_-]*$`).MatchString(chain) {
+	if !chainNameRegex.MatchString(chain) {
 		return ValidationError{Field: "chain", Message: "invalid chain name format"}
 	}
 
@@ -78,12 +103,12 @@ func (v *Validator) ValidateAddress(address, chain string) ValidationError {
 
 	chain = strings.ToLower(chain)
 
-	switch chain {
-	case "ethereum", "polygon":
+	switch chainType(chain) {
+	case blockchain.ChainTypeEVM:
 		if !ethereumAddressRegex.MatchString(address) {
 			return ValidationError{Field: "address", Message: "invalid Ethereum/EVM address format"}
 		}
-	case "bitcoin":
+	case blockchain.ChainTypeBitcoin:
 		if !bitcoinAddressRegex.MatchString(address) {
 			return ValidationError{Field: "address", Message: "invalid Bitcoin address format"}
 		}
@@ -105,19 +130,19 @@ func (v *Validator) ValidateTransactionHash(hash, chain string) ValidationError 
 
 	chain = strings.ToLower(chain)
 
-	switch chain {
-	case "ethereum", "polygon":
+	switch chainType(chain) {
+	case blockchain.ChainTypeEVM:
 		if !transactionHashRegex.MatchString(hash) {
 			return ValidationError{Field: "hash", Message: "invalid Ethereum/EVM transaction hash format"}
 		}
-	case "bitcoin":
+	case blockchain.ChainTypeBitcoin:
 		// Bitcoin transaction hashes are also 64 character hex strings, but without 0x prefix
-		if !regexp.MustCompile(`^[a-fA-F0-9]{64}$`).MatchString(hash) {
+		if !bitcoinTransactionHashRegex.MatchString(hash) {
 			return ValidationError{Field: "hash", Message: "invalid Bitcoin transaction hash format"}
 		}
 	default:
 		// For unknown chains, basic hex validation
-		if !regexp.MustCompile(`^(0x)?[a-fA-F0-9]{64}$`).MatchString(hash) {
+		if !genericTransactionHashRegex.MatchString(hash) {
 			return ValidationError{Field: "hash", Message: "invalid transaction hash format"}
 		}
 	}
@@ -186,7 +211,7 @@ func (v *Validator) ValidateRPCRequest(method string, params interface{}) Valida
 	}
 
 	// Basic method name validation
-	if !regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`).MatchString(method) {
+	if !rpcMethodRegex.MatchString(method) {
 		errors = append(errors, ValidationError{Field: "method", Message: "invalid RPC method format"})
 	}
 

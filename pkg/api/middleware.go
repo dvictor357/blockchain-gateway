@@ -2,91 +2,121 @@ package api
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/dvictor357/blaze"
 )
 
-func RateLimit(rateLimit int) gin.HandlerFunc {
+func RateLimit(rateLimit int) blaze.MiddlewareFunc {
+	const perMinute = time.Minute
 
-	// Implement rate limiting logic here
-	// For now, we'll use a simple in-memory map to track requests per IP
-	// In production, consider using a distributed rate limiter like redis
-
-	perMinute := 60 * time.Second
-
-	// Use a mutex-protected map to store request counts and timestamps
 	type rateLimitEntry struct {
 		count     int
 		lastReset time.Time
 	}
 
 	var (
-		rateLimitMap = make(map[string]*rateLimitEntry)
+		rateLimitMap = make(map[string]rateLimitEntry)
 		mutex        sync.Mutex
+		lastSweep    time.Time
 	)
 
-	return func(c *gin.Context) {
-		ip := c.ClientIP()
+	return func(next blaze.HandlerFunc) blaze.HandlerFunc {
+		return func(c *blaze.Context) error {
+			ip := peerIP(c.Request)
 
-		mutex.Lock()
-		defer mutex.Unlock()
-
-		// Get or initialize the entry for this IP
-		entry, exists := rateLimitMap[ip]
-		currentTime := time.Now()
-
-		if !exists {
-			rateLimitMap[ip] = &rateLimitEntry{
-				count:     1,
-				lastReset: currentTime,
+			mutex.Lock()
+			currentTime := time.Now()
+			if currentTime.Sub(lastSweep) >= perMinute {
+				for peer, entry := range rateLimitMap {
+					if currentTime.Sub(entry.lastReset) > perMinute {
+						delete(rateLimitMap, peer)
+					}
+				}
+				lastSweep = currentTime
 			}
-			c.Next()
-			return
-		}
 
-		// Reset count if more than a minute has passed
-		if currentTime.Sub(entry.lastReset) > perMinute {
-			entry.count = 1
-			entry.lastReset = currentTime
-			c.Next()
-			return
-		}
+			entry, exists := rateLimitMap[ip]
+			if !exists || currentTime.Sub(entry.lastReset) > perMinute {
+				rateLimitMap[ip] = rateLimitEntry{count: 1, lastReset: currentTime}
+				mutex.Unlock()
+				return next(c)
+			}
 
-		// Check if rate limit is exceeded
-		if entry.count >= rateLimit {
-			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
-				"error": "Rate limit exceeded. Please try again later.",
-			})
-			return
-		}
+			if entry.count >= rateLimit {
+				mutex.Unlock()
+				return c.JSON(http.StatusTooManyRequests, struct {
+					Error string `json:"error"`
+				}{Error: "Rate limit exceeded. Please try again later."})
+			}
 
-		// Increment count and allow request
-		entry.count++
-		c.Next()
+			entry.count++
+			rateLimitMap[ip] = entry
+			mutex.Unlock()
+			return next(c)
+		}
 	}
 }
 
-func LoggingMiddleware(logger *log.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
+func LoggingMiddleware(logger *log.Logger) blaze.MiddlewareFunc {
+	return func(next blaze.HandlerFunc) blaze.HandlerFunc {
+		return func(c *blaze.Context) error {
+			start := time.Now()
+			writer := &statusResponseWriter{ResponseWriter: c.ResponseWriter}
+			c.ResponseWriter = writer
 
-		// Process request
-		c.Next()
+			err := next(c)
 
-		// Log request after completion
-		latency := time.Since(start)
-		status := c.Writer.Status()
-
-		logger.Printf(
-			"[%s] %s %s %d %s",
-			c.Request.Method,
-			c.Request.URL.Path,
-			c.ClientIP(),
-			status,
-			latency,
-		)
+			status := writer.status
+			if status == 0 {
+				status = http.StatusOK
+			}
+			logger.Printf(
+				"[%s] %s %s %d %s",
+				c.Request.Method,
+				c.Request.URL.Path,
+				peerIP(c.Request),
+				status,
+				time.Since(start),
+			)
+			return err
+		}
 	}
+}
+
+func peerIP(request *http.Request) string {
+	ip, _, err := net.SplitHostPort(request.RemoteAddr)
+	if err != nil {
+		return request.RemoteAddr
+	}
+	return ip
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusResponseWriter) WriteHeader(status int) {
+	if w.status != 0 {
+		return
+	}
+	w.ResponseWriter.WriteHeader(status)
+	if status >= 200 {
+		w.status = status
+	}
+}
+
+func (w *statusResponseWriter) Write(body []byte) (int, error) {
+	if w.status == 0 {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(body)
+}
+
+func (w *statusResponseWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
 }

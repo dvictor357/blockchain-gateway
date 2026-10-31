@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24.3-alpine AS builder
+FROM golang:1.25.5-alpine AS builder
 
 # Install necessary build tools
 RUN apk add --no-cache git make
@@ -20,10 +20,10 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /blockchain-gateway ./cmd/server
 
 # Development stage (for development with Air hot-reload)
-FROM golang:1.24.3-alpine AS development
+FROM golang:1.25.5-alpine AS development
 
 # Install Air for live reload and necessary tools
-RUN go install github.com/cosmtrek/air@latest && \
+RUN go install github.com/air-verse/air@v1.63.0 && \
     apk add --no-cache git make
 
 # Set working directory
@@ -39,7 +39,7 @@ RUN go mod download
 EXPOSE 8080
 
 # Set environment to development
-ENV GIN_MODE=debug
+ENV APP_MODE=debug
 
 # Command to run Air for hot-reloading
 CMD ["air", "-c", ".air.toml"]
@@ -56,8 +56,9 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /blockchain-gateway .
 
-# Copy config files if needed
-COPY .env* ./
+# Database migrations are applied at startup. Configuration (including any .env values)
+# is supplied at runtime via environment variables and is never baked into the image.
+COPY --from=builder /app/migrations ./migrations
 
 # Create a non-root user and switch to it
 RUN adduser -D -g '' appuser && \
@@ -68,7 +69,7 @@ USER appuser
 EXPOSE 8080
 
 # Set environment variables
-ENV GIN_MODE=release
+ENV APP_MODE=release
 
 # Command to run
 CMD ["./blockchain-gateway"]

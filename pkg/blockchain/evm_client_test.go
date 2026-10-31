@@ -3,9 +3,13 @@ package blockchain
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,491 +17,428 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewEVMClient(t *testing.T) {
-	tests := []struct {
-		name       string
-		clientName string
-		rpcURL     string
-		httpClient *http.Client
-	}{
-		{
-			name:       "with custom http client",
-			clientName: "ethereum",
-			rpcURL:     "https://eth.example.com",
-			httpClient: &http.Client{Timeout: 10 * time.Second},
-		},
-		{
-			name:       "with nil http client (should use default)",
-			clientName: "polygon",
-			rpcURL:     "https://polygon.example.com",
-			httpClient: nil,
-		},
+func TestEVMClient_Execute_SendsJSONRPCRequest(t *testing.T) {
+	var got struct {
+		JSONRPC string          `json:"jsonrpc"`
+		Method  string          `json:"method"`
+		Params  json.RawMessage `json:"params"`
+		ID      json.RawMessage `json:"id"`
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client := NewEVMClient(tt.clientName, tt.rpcURL, tt.httpClient)
-
-			assert.NotNil(t, client)
-			assert.Equal(t, tt.clientName, client.name)
-			assert.Equal(t, tt.rpcURL, client.rpcURL)
-			assert.NotNil(t, client.httpClient)
-			assert.Equal(t, uint64(0), client.requestID)
-
-			if tt.httpClient == nil {
-				assert.Equal(t, http.DefaultClient, client.httpClient)
-			} else {
-				assert.Equal(t, tt.httpClient, client.httpClient)
-			}
-		})
-	}
-}
-
-func TestEVMClient_Name(t *testing.T) {
-	client := NewEVMClient("test-chain", "https://test.example.com", nil)
-	assert.Equal(t, "test-chain", client.Name())
-}
-
-func TestEVMClient_Execute(t *testing.T) {
-	tests := []struct {
-		name           string
-		method         string
-		params         interface{}
-		serverResponse string
-		serverStatus   int
-		expectedResult json.RawMessage
-		expectedError  string
-	}{
-		{
-			name:           "successful RPC call",
-			method:         "eth_blockNumber",
-			params:         []interface{}{},
-			serverResponse: `{"jsonrpc":"2.0","result":"0x1234567","id":1}`,
-			serverStatus:   http.StatusOK,
-			expectedResult: json.RawMessage(`"0x1234567"`),
-		},
-		{
-			name:           "successful RPC call with params",
-			method:         "eth_getBalance",
-			params:         []interface{}{"0x123", "latest"},
-			serverResponse: `{"jsonrpc":"2.0","result":"0xde0b6b3a7640000","id":1}`,
-			serverStatus:   http.StatusOK,
-			expectedResult: json.RawMessage(`"0xde0b6b3a7640000"`),
-		},
-		{
-			name:           "RPC error response",
-			method:         "eth_getBalance",
-			params:         []interface{}{"invalid", "latest"},
-			serverResponse: `{"jsonrpc":"2.0","error":{"code":-32602,"message":"Invalid params"},"id":1}`,
-			serverStatus:   http.StatusOK,
-			expectedError:  "RPC error: -32602 - Invalid params",
-		},
-		{
-			name:           "HTTP error",
-			method:         "eth_blockNumber",
-			params:         []interface{}{},
-			serverResponse: `{"error":"Internal server error"}`,
-			serverStatus:   http.StatusInternalServerError,
-			expectedError:  "unexpected status code: 500",
-		},
-		{
-			name:           "invalid JSON response",
-			method:         "eth_blockNumber",
-			params:         []interface{}{},
-			serverResponse: `invalid json`,
-			serverStatus:   http.StatusOK,
-			expectedError:  "failed to unmarshal response",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a test server
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify request method and headers
-				assert.Equal(t, "POST", r.Method)
-				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-				assert.Equal(t, "application/json", r.Header.Get("Accept"))
-
-				// Verify request body structure
-				var request RPCRequest
-				err := json.NewDecoder(r.Body).Decode(&request)
-				require.NoError(t, err)
-				assert.Equal(t, "2.0", request.JSONRPC)
-				assert.Equal(t, tt.method, request.Method)
-				assert.NotNil(t, request.ID)
-
-				// Send response
-				w.WriteHeader(tt.serverStatus)
-				w.Write([]byte(tt.serverResponse))
-			}))
-			defer server.Close()
-
-			// Create client with test server URL
-			client := NewEVMClient("test", server.URL, nil)
-
-			// Execute the method
-			ctx := context.Background()
-			result, err := client.Execute(ctx, tt.method, tt.params)
-
-			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-				assert.Nil(t, result)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedResult, result)
-			}
-		})
-	}
-}
-
-func TestEVMClient_Execute_RequestID(t *testing.T) {
-	// Test that request IDs are incremented
+	var method, contentType string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var request RPCRequest
-		json.NewDecoder(r.Body).Decode(&request)
-
-		// Echo back the request ID in the response
-		response := map[string]interface{}{
-			"jsonrpc": "2.0",
-			"result":  "success",
-			"id":      request.ID,
-		}
-		json.NewEncoder(w).Encode(response)
+		method, contentType = r.Method, r.Header.Get("Content-Type")
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &got)
+		_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":1,"result":"0x1"}`)
 	}))
 	defer server.Close()
 
-	client := NewEVMClient("test", server.URL, nil)
-	ctx := context.Background()
+	_, err := NewEVMClient("test", server.URL, nil).Execute(context.Background(), "eth_getBalance", []any{"0xabc", "latest"})
 
-	// Make multiple requests and verify IDs increment
-	for i := 1; i <= 3; i++ {
-		_, err := client.Execute(ctx, "test_method", []interface{}{})
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(i), client.requestID)
+	require.NoError(t, err)
+	assert.Equal(t, http.MethodPost, method)
+	assert.Equal(t, "application/json", contentType)
+	assert.Equal(t, "2.0", got.JSONRPC)
+	assert.Equal(t, "eth_getBalance", got.Method)
+	assert.JSONEq(t, `["0xabc","latest"]`, string(got.Params))
+	assert.Equal(t, "1", string(got.ID))
+}
+
+func TestEVMClient_Execute_ValidResponses(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "string result", body: `{"jsonrpc":"2.0","result":"0x1234567","id":1}`, want: `"0x1234567"`},
+		{name: "null result is preserved", body: `{"jsonrpc":"2.0","result":null,"id":1}`, want: `null`},
+		{name: "object result", body: `{"jsonrpc":"2.0","id":1,"result":{"a":[1,2]}}`, want: `{"a":[1,2]}`},
+		{name: "null error next to a result", body: `{"jsonrpc":"2.0","id":1,"result":"0x1","error":null}`, want: `"0x1"`},
+		{name: "whitespace after the envelope", body: "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":true}\n\n", want: `true`},
 	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newRawServer(t, http.StatusOK, tt.body)
+
+			result, err := NewEVMClient("test", server.URL, nil).Execute(context.Background(), "m", []any{})
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, string(result))
+		})
+	}
+}
+
+func TestEVMClient_Execute_RejectsInvalidResponses(t *testing.T) {
+	tests := []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{name: "HTTP 500 with a success body", status: 500, body: `{"jsonrpc":"2.0","id":1,"result":"0x1"}`},
+		{name: "HTTP 503 with a success body", status: 503, body: `{"jsonrpc":"2.0","id":1,"result":"0x1"}`},
+		{name: "HTTP 404", status: 404, body: `not found`},
+		{name: "empty body", status: 200, body: ``},
+		{name: "empty envelope", status: 200, body: `{}`},
+		{name: "invalid JSON", status: 200, body: `invalid json`},
+		{name: "array instead of envelope", status: 200, body: `[{"jsonrpc":"2.0","id":1,"result":"0x1"}]`},
+		{name: "second JSON value", status: 200, body: `{"jsonrpc":"2.0","id":1,"result":"0x1"}{"x":1}`},
+		{name: "trailing garbage", status: 200, body: `{"jsonrpc":"2.0","id":1,"result":"0x1"} junk`},
+		{name: "wrong version", status: 200, body: `{"jsonrpc":"1.0","id":1,"result":"0x1"}`},
+		{name: "missing version", status: 200, body: `{"id":1,"result":"0x1"}`},
+		{name: "missing id", status: 200, body: `{"jsonrpc":"2.0","result":"0x1"}`},
+		{name: "null id", status: 200, body: `{"jsonrpc":"2.0","id":null,"result":"0x1"}`},
+		{name: "wrong id", status: 200, body: `{"jsonrpc":"2.0","id":2,"result":"0x1"}`},
+		{name: "string id", status: 200, body: `{"jsonrpc":"2.0","id":"1","result":"0x1"}`},
+		{name: "error response with null id", status: 200, body: `{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"bad"}}`},
+		{name: "error response with wrong id", status: 200, body: `{"jsonrpc":"2.0","id":9,"error":{"code":-32600,"message":"bad"}}`},
+		{name: "neither result nor error", status: 200, body: `{"jsonrpc":"2.0","id":1}`},
+		{name: "null error and no result", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":null}`},
+		{name: "error together with result", status: 200, body: `{"jsonrpc":"2.0","id":1,"result":"0x1","error":{"code":1,"message":"m"}}`},
+		{name: "error together with null result", status: 200, body: `{"jsonrpc":"2.0","id":1,"result":null,"error":{"code":1,"message":"m"}}`},
+		{name: "error without code", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":{"message":"m"}}`},
+		{name: "error without message", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":{"code":1}}`},
+		{name: "error with string code", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":{"code":"1","message":"m"}}`},
+		{name: "error with fractional code", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":{"code":1.5,"message":"m"}}`},
+		{name: "error with non-string message", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":{"code":1,"message":7}}`},
+		{name: "error that is not an object", status: 200, body: `{"jsonrpc":"2.0","id":1,"error":"boom"}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newRawServer(t, tt.status, tt.body)
+
+			result, err := NewEVMClient("test", server.URL, nil).Execute(context.Background(), "m", []any{})
+
+			require.Error(t, err)
+			assert.Nil(t, result)
+			assert.ErrorIs(t, err, ErrUpstream)
+			var rpcErr *RPCError
+			assert.False(t, errors.As(err, &rpcErr), "malformed envelopes are not node-reported errors")
+		})
+	}
+}
+
+func TestEVMClient_Execute_PreservesStructuredRPCErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		errorObj string
+		code     int
+		message  string
+		data     string
+	}{
+		{name: "object data", errorObj: `{"code":3,"message":"execution reverted","data":{"reason":"0x08c379a0","list":[1,{"a":null}]}}`, code: 3, message: "execution reverted", data: `{"reason":"0x08c379a0","list":[1,{"a":null}]}`},
+		{name: "string data", errorObj: `{"code":-32000,"message":"boom","data":"0xdeadbeef"}`, code: -32000, message: "boom", data: `"0xdeadbeef"`},
+		{name: "number data", errorObj: `{"code":-32602,"message":"bad params","data":42}`, code: -32602, message: "bad params", data: `42`},
+		{name: "no data", errorObj: `{"code":-32601,"message":"method not found"}`, code: -32601, message: "method not found"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, _ := newNode(t, false, func(nodeCall) nodeReply { return nodeReply{rpcError: tt.errorObj} })
+
+			_, err := NewEVMClient("test", server.URL, nil).Execute(context.Background(), "m", []any{})
+
+			var rpcErr *RPCError
+			require.ErrorAs(t, err, &rpcErr)
+			assert.Equal(t, tt.code, rpcErr.Code)
+			assert.Equal(t, tt.message, rpcErr.Message)
+			assert.Equal(t, tt.data, string(rpcErr.Data))
+			assert.NotErrorIs(t, err, ErrUpstream, "a node error is not an upstream protocol failure")
+		})
+	}
+}
+
+func TestEVMClient_Execute_NonSuccessStatusWithErrorEnvelopeIsStillAnError(t *testing.T) {
+	server := newRawServer(t, http.StatusBadRequest, `{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"bad","data":{"x":1}}}`)
+
+	_, err := NewEVMClient("test", server.URL, nil).Execute(context.Background(), "m", []any{})
+
+	var rpcErr *RPCError
+	require.ErrorAs(t, err, &rpcErr)
+	assert.Equal(t, -32602, rpcErr.Code)
+	assert.JSONEq(t, `{"x":1}`, string(rpcErr.Data))
+}
+
+func TestEVMClient_Execute_ErrorsDoNotExposeURLOrBody(t *testing.T) {
+	const secretPath = "/v2/secret-api-key"
+	oversized := strings.Repeat("x", 2000) + "SECRET-BODY-TAIL"
+
+	t.Run("bad status with a large body", func(t *testing.T) {
+		server := newRawServer(t, http.StatusInternalServerError, oversized)
+
+		_, err := NewEVMClient("test", server.URL+secretPath, nil).Execute(context.Background(), "m", nil)
+
+		require.ErrorIs(t, err, ErrUpstream)
+		assert.Less(t, len(err.Error()), 600, "diagnostic text must be bounded")
+		assert.NotContains(t, err.Error(), "secret-api-key")
+		assert.NotContains(t, err.Error(), "SECRET-BODY-TAIL")
+	})
+
+	t.Run("transport failure", func(t *testing.T) {
+		server := httptest.NewServer(http.NotFoundHandler())
+		url := server.URL + secretPath
+		server.Close() // nothing listens on this loopback port any more
+
+		_, err := NewEVMClient("test", url, nil).Execute(context.Background(), "m", nil)
+
+		require.ErrorIs(t, err, ErrUpstream)
+		assert.NotContains(t, err.Error(), "secret-api-key")
+	})
+}
+
+// timeoutNetError mimics the error an http.Client returns when its own Timeout elapses.
+type timeoutNetError struct{}
+
+func (timeoutNetError) Error() string   { return "client timeout" }
+func (timeoutNetError) Timeout() bool   { return true }
+func (timeoutNetError) Temporary() bool { return true }
+
+var _ net.Error = timeoutNetError{}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestEVMClient_Execute_TimeoutAndCancellationAreDistinct(t *testing.T) {
+	t.Run("expired context deadline", func(t *testing.T) {
+		server, hits := newNode(t, false, func(nodeCall) nodeReply { return nodeReply{result: `"0x1"`} })
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+		defer cancel()
+
+		_, err := NewEVMClient("test", server.URL, nil).Execute(ctx, "m", nil)
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.True(t, IsTimeout(err))
+		assert.NotErrorIs(t, err, context.Canceled)
+		assert.Zero(t, hits.Load())
+	})
+
+	t.Run("http client timeout", func(t *testing.T) {
+		client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, timeoutNetError{}
+		})}
+
+		_, err := NewEVMClient("test", "http://node.invalid", client).Execute(context.Background(), "m", nil)
+
+		require.Error(t, err)
+		assert.True(t, IsTimeout(err))
+		assert.NotErrorIs(t, err, context.Canceled)
+	})
+
+	t.Run("cancellation while the node is busy", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		release := make(chan struct{})
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Drain the request so the server can notice the client disconnecting.
+			_, _ = io.Copy(io.Discard, r.Body)
+			cancel()
+			select {
+			case <-r.Context().Done():
+			case <-release:
+			}
+		}))
+		defer server.Close()
+		defer close(release) // runs before server.Close so a stuck handler can never block it
+
+		_, err := NewEVMClient("test", server.URL, nil).Execute(ctx, "m", nil)
+
+		require.Error(t, err)
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.False(t, IsTimeout(err), "client cancellation is not a timeout")
+	})
+}
+
+func TestEVMClient_Execute_ConcurrentCallsUseDistinctIDs(t *testing.T) {
+	var mu sync.Mutex
+	seen := map[string]int{}
+	server, _ := newNode(t, false, func(call nodeCall) nodeReply {
+		mu.Lock()
+		seen[string(call.ID)]++
+		mu.Unlock()
+		return nodeReply{result: string(call.ID)}
+	})
+	client := NewEVMClient("test", server.URL, nil)
+
+	const callers = 25
+	var wg sync.WaitGroup
+	errs := make(chan error, callers)
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := client.Execute(context.Background(), "m", nil)
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		assert.NoError(t, err, "each response must carry its own request's id")
+	}
+	assert.Len(t, seen, callers)
 }
 
 func TestEVMClient_GetLatestBlockNumber(t *testing.T) {
 	tests := []struct {
-		name           string
-		serverResponse string
-		expectedResult uint64
-		expectedError  string
+		name    string
+		result  string
+		want    uint64
+		wantErr bool
 	}{
-		{
-			name:           "valid block number",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x1234567","id":1}`,
-			expectedResult: 0x1234567,
-		},
-		{
-			name:           "zero block number",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x0","id":1}`,
-			expectedResult: 0,
-		},
-		{
-			name:           "invalid hex format",
-			serverResponse: `{"jsonrpc":"2.0","result":"invalid","id":1}`,
-			expectedError:  "failed to parse block number",
-		},
-		{
-			name:           "non-string result",
-			serverResponse: `{"jsonrpc":"2.0","result":123,"id":1}`,
-			expectedError:  "failed to unmarshal block number",
-		},
+		{name: "valid block number", result: `"0x1234567"`, want: 0x1234567},
+		{name: "zero block number", result: `"0x0"`, want: 0},
+		{name: "invalid hex", result: `"invalid"`, wantErr: true},
+		{name: "prefix only", result: `"0x"`, wantErr: true},
+		{name: "null result is not zero", result: `null`, wantErr: true},
+		{name: "non-string result", result: `123`, wantErr: true},
+		{name: "overflow", result: `"0x1ffffffffffffffff"`, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte(tt.serverResponse))
-			}))
-			defer server.Close()
+			server, _ := newNode(t, false, func(nodeCall) nodeReply { return nodeReply{result: tt.result} })
 
-			client := NewEVMClient("test", server.URL, nil)
-			ctx := context.Background()
+			got, err := NewEVMClient("test", server.URL, nil).GetLatestBlockNumber(context.Background())
 
-			result, err := client.GetLatestBlockNumber(ctx)
-
-			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedResult, result)
+			if tt.wantErr {
+				assert.ErrorIs(t, err, ErrUpstream)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestEVMClient_GetBalance(t *testing.T) {
+func TestEVMClient_BlockSelectorDefaultsToLatest(t *testing.T) {
 	tests := []struct {
-		name           string
-		address        string
-		blockNumber    string
-		serverResponse string
-		expectedResult string
-		expectedError  string
+		name     string
+		selector string
+		want     string
 	}{
-		{
-			name:           "valid balance with latest block",
-			address:        "0x123",
-			blockNumber:    "latest",
-			serverResponse: `{"jsonrpc":"2.0","result":"0xde0b6b3a7640000","id":1}`,
-			expectedResult: "0xde0b6b3a7640000",
-		},
-		{
-			name:           "valid balance with empty block number (should default to latest)",
-			address:        "0x123",
-			blockNumber:    "",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x0","id":1}`,
-			expectedResult: "0x0",
-		},
-		{
-			name:           "valid balance with specific block number",
-			address:        "0x123",
-			blockNumber:    "0x1234",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x1000","id":1}`,
-			expectedResult: "0x1000",
-		},
+		{name: "empty", selector: "", want: "latest"},
+		{name: "blank", selector: "  ", want: "latest"},
+		{name: "latest", selector: "latest", want: "latest"},
+		{name: "explicit block", selector: "0x1234", want: "0x1234"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify the request parameters
-				var request RPCRequest
-				json.NewDecoder(r.Body).Decode(&request)
-				assert.Equal(t, "eth_getBalance", request.Method)
+		for _, method := range []string{"eth_getBalance", "eth_getTransactionCount"} {
+			t.Run(method+"/"+tt.name, func(t *testing.T) {
+				var params []string
+				server, _ := newNode(t, false, func(call nodeCall) nodeReply {
+					assert.Equal(t, method, call.Method)
+					assert.NoError(t, json.Unmarshal(call.Params, &params))
+					return nodeReply{result: `"0x1"`}
+				})
+				client := NewEVMClient("test", server.URL, nil)
 
-				params, ok := request.Params.([]interface{})
-				require.True(t, ok)
-				assert.Equal(t, tt.address, params[0])
-
-				expectedBlock := tt.blockNumber
-				if expectedBlock == "" {
-					expectedBlock = "latest"
+				var err error
+				if method == "eth_getBalance" {
+					_, err = client.GetBalance(context.Background(), "0x123", tt.selector)
+				} else {
+					_, err = client.GetTransactionCount(context.Background(), "0x123", tt.selector)
 				}
-				assert.Equal(t, expectedBlock, params[1])
 
-				w.Write([]byte(tt.serverResponse))
-			}))
-			defer server.Close()
-
-			client := NewEVMClient("test", server.URL, nil)
-			ctx := context.Background()
-
-			result, err := client.GetBalance(ctx, tt.address, tt.blockNumber)
-
-			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedResult, result)
-			}
-		})
+				require.NoError(t, err)
+				assert.Equal(t, []string{"0x123", tt.want}, params)
+			})
+		}
 	}
 }
 
-func TestEVMClient_GetTransactionCount(t *testing.T) {
-	tests := []struct {
-		name           string
-		address        string
-		blockNumber    string
-		serverResponse string
-		expectedResult uint64
-		expectedError  string
-	}{
-		{
-			name:           "valid transaction count",
-			address:        "0x123",
-			blockNumber:    "latest",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x2a","id":1}`,
-			expectedResult: 42,
-		},
-		{
-			name:           "zero transaction count",
-			address:        "0x123",
-			blockNumber:    "latest",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x0","id":1}`,
-			expectedResult: 0,
-		},
-		{
-			name:           "invalid hex format",
-			address:        "0x123",
-			blockNumber:    "latest",
-			serverResponse: `{"jsonrpc":"2.0","result":"invalid","id":1}`,
-			expectedError:  "failed to parse transaction count",
-		},
-	}
+func TestEVMClient_GetTransactionCount_RejectsMalformedQuantity(t *testing.T) {
+	for _, result := range []string{`"invalid"`, `"0x"`, `null`, `"-0x1"`} {
+		server, _ := newNode(t, false, func(nodeCall) nodeReply { return nodeReply{result: result} })
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Write([]byte(tt.serverResponse))
-			}))
-			defer server.Close()
+		_, err := NewEVMClient("test", server.URL, nil).GetTransactionCount(context.Background(), "0x123", "latest")
 
-			client := NewEVMClient("test", server.URL, nil)
-			ctx := context.Background()
-
-			result, err := client.GetTransactionCount(ctx, tt.address, tt.blockNumber)
-
-			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedResult, result)
-			}
-		})
+		assert.ErrorIs(t, err, ErrUpstream, result)
 	}
 }
 
 func TestEVMClient_SendRawTransaction(t *testing.T) {
+	const body = "f86c808504a817c800825208"
+
 	tests := []struct {
-		name           string
-		signedTxData   string
-		serverResponse string
-		expectedResult string
-		expectedError  string
+		name  string
+		input string
+		want  string
 	}{
-		{
-			name:           "valid transaction with 0x prefix",
-			signedTxData:   "0xf86c808504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a0",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x1234567890abcdef","id":1}`,
-			expectedResult: "0x1234567890abcdef",
-		},
-		{
-			name:           "valid transaction without 0x prefix (should add it)",
-			signedTxData:   "f86c808504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a0",
-			serverResponse: `{"jsonrpc":"2.0","result":"0x1234567890abcdef","id":1}`,
-			expectedResult: "0x1234567890abcdef",
-		},
+		{name: "0x prefix kept", input: "0x" + body, want: "0x" + body},
+		{name: "prefix added", input: body, want: "0x" + body},
+		{name: "uppercase prefix normalized", input: "0X" + body, want: "0x" + body},
+		{name: "whitespace trimmed", input: "  " + body + "\n", want: "0x" + body},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify the request parameters
-				var request RPCRequest
-				json.NewDecoder(r.Body).Decode(&request)
-				assert.Equal(t, "eth_sendRawTransaction", request.Method)
+			var params []string
+			server, _ := newNode(t, false, func(call nodeCall) nodeReply {
+				assert.Equal(t, "eth_sendRawTransaction", call.Method)
+				assert.NoError(t, json.Unmarshal(call.Params, &params))
+				return nodeReply{result: `"0xabc123"`}
+			})
 
-				params, ok := request.Params.([]interface{})
-				require.True(t, ok)
+			hash, err := NewEVMClient("test", server.URL, nil).SendRawTransaction(context.Background(), tt.input)
 
-				// Should always have 0x prefix in the request
-				txData := params[0].(string)
-				assert.True(t, strings.HasPrefix(txData, "0x"))
-
-				w.Write([]byte(tt.serverResponse))
-			}))
-			defer server.Close()
-
-			client := NewEVMClient("test", server.URL, nil)
-			ctx := context.Background()
-
-			result, err := client.SendRawTransaction(ctx, tt.signedTxData)
-
-			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedResult, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, "0xabc123", hash)
+			assert.Equal(t, []string{tt.want}, params)
 		})
 	}
+
+	t.Run("empty data is rejected before contacting the node", func(t *testing.T) {
+		server, hits := newNode(t, false, func(nodeCall) nodeReply { return nodeReply{result: `"0x"`} })
+
+		_, err := NewEVMClient("test", server.URL, nil).SendRawTransaction(context.Background(), " ")
+
+		assert.ErrorIs(t, err, ErrInvalidRequest)
+		assert.Zero(t, hits.Load())
+	})
 }
 
 func TestParseHexToUint64(t *testing.T) {
-	tests := []struct {
-		name          string
-		hexStr        string
-		expectedValue uint64
-		expectedError string
-	}{
-		{
-			name:          "valid hex with 0x prefix",
-			hexStr:        "0x1234",
-			expectedValue: 0x1234,
-		},
-		{
-			name:          "valid hex without 0x prefix",
-			hexStr:        "1234",
-			expectedValue: 0x1234,
-		},
-		{
-			name:          "zero value",
-			hexStr:        "0x0",
-			expectedValue: 0,
-		},
-		{
-			name:          "large hex value",
-			hexStr:        "0xffffffffffffffff",
-			expectedValue: 0xffffffffffffffff,
-		},
-		{
-			name:          "invalid hex characters",
-			hexStr:        "0xghij",
-			expectedError: "invalid hex string",
-		},
-		{
-			name:          "empty string",
-			hexStr:        "",
-			expectedError: "invalid hex string",
-		},
-		{
-			name:          "non-hex string",
-			hexStr:        "not_hex",
-			expectedError: "invalid hex string",
-		},
+	valid := map[string]uint64{
+		"0x1234":             0x1234,
+		"1234":               0x1234, // the prefix is optional
+		"0x0":                0,
+		"0x0000000000000001": 1,
+		"0xFFFFFFFFFFFFFFFF": 0xffffffffffffffff,
+		"0xffffffffffffffff": 0xffffffffffffffff,
+	}
+	for input, want := range valid {
+		got, err := parseHexToUint64(input)
+		require.NoError(t, err, input)
+		assert.Equal(t, want, got, input)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseHexToUint64(tt.hexStr)
-
-			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedValue, result)
-			}
-		})
+	for _, input := range []string{"", "0x", "0xghij", "not_hex", "-1", "+1", "-0x1", "0x 1", " 0x1", "0x1_0", "0x1ffffffffffffffff", "0X1"} {
+		_, err := parseHexToUint64(input)
+		assert.ErrorIs(t, err, ErrUpstream, "%q", input)
 	}
 }
 
-func TestEVMClient_ContextCancellation(t *testing.T) {
-	// Test that context cancellation is properly handled
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Simulate a slow response
-		time.Sleep(100 * time.Millisecond)
-		w.Write([]byte(`{"jsonrpc":"2.0","result":"0x123","id":1}`))
-	}))
-	defer server.Close()
+func TestParseHexBigInt(t *testing.T) {
+	got, err := parseHexBigInt("0xde0b6b3a7640000")
+	require.NoError(t, err)
+	assert.Equal(t, "1000000000000000000", got.String())
 
-	client := NewEVMClient("test", server.URL, nil)
+	max := "0x" + strings.Repeat("f", 64)
+	got, err = parseHexBigInt(max)
+	require.NoError(t, err)
+	assert.Equal(t, 256, got.BitLen())
 
-	// Create a context that will be cancelled quickly
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer cancel()
+	got, err = parseHexBigInt("0x" + strings.Repeat("0", 70) + "1")
+	require.NoError(t, err, "leading zeros are not significant digits")
+	assert.Equal(t, "1", got.String())
 
-	_, err := client.Execute(ctx, "eth_blockNumber", []interface{}{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "context deadline exceeded")
-}
-
-func TestEVMClient_NetworkError(t *testing.T) {
-	// Test handling of network errors
-	client := NewEVMClient("test", "http://nonexistent.example.com", nil)
-	ctx := context.Background()
-
-	_, err := client.Execute(ctx, "eth_blockNumber", []interface{}{})
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to execute request")
+	for _, input := range []string{"", "0x", "-0x1", "-1", "0xzz", "0x1" + strings.Repeat("0", 64)} {
+		_, err := parseHexBigInt(input)
+		assert.ErrorIs(t, err, ErrUpstream, "%q", input)
+	}
 }

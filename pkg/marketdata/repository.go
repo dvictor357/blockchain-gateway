@@ -3,14 +3,69 @@ package marketdata
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dvictor357/blockchain-gateway/pkg/models"
 	_ "github.com/lib/pq"
 )
+
+const (
+	// upsertParamsPerRow is the number of bound parameters per market row (data_fetched_at uses NOW()).
+	upsertParamsPerRow = 26
+	// upsertRoiParam is the zero-based position of the roi parameter, which is cast to jsonb.
+	upsertRoiParam = 24
+	// upsertRowsPerStatement keeps each statement far below PostgreSQL's 65535-parameter limit.
+	upsertRowsPerStatement = 500
+)
+
+// marketColumns lists the coin_markets columns in the order used for reads and scans.
+var marketColumns = []string{
+	"id", "symbol", "name", "image", "current_price", "market_cap", "market_cap_rank",
+	"fully_diluted_valuation", "total_volume", "high_24h", "low_24h",
+	"price_change_24h", "price_change_percentage_24h",
+	"market_cap_change_24h", "market_cap_change_percentage_24h",
+	"circulating_supply", "total_supply", "max_supply", "ath", "ath_change_percentage", "ath_date",
+	"atl", "atl_change_percentage", "atl_date", "roi", "last_updated", "data_fetched_at",
+}
+
+// upsertColumns are the columns written by an upsert: the parameter columns in order, then data_fetched_at.
+var upsertColumns = strings.Join(marketColumns, ", ")
+
+// pageSelectColumns is the page-qualified column list of the paginated read, built once at startup.
+var pageSelectColumns = "page." + strings.Join(marketColumns, ", page.")
+
+const upsertConflictClause = `
+	ON CONFLICT (id) DO UPDATE SET
+		symbol = EXCLUDED.symbol,
+		name = EXCLUDED.name,
+		image = EXCLUDED.image,
+		current_price = EXCLUDED.current_price,
+		market_cap = EXCLUDED.market_cap,
+		market_cap_rank = EXCLUDED.market_cap_rank,
+		fully_diluted_valuation = EXCLUDED.fully_diluted_valuation,
+		total_volume = EXCLUDED.total_volume,
+		high_24h = EXCLUDED.high_24h,
+		low_24h = EXCLUDED.low_24h,
+		price_change_24h = EXCLUDED.price_change_24h,
+		price_change_percentage_24h = EXCLUDED.price_change_percentage_24h,
+		market_cap_change_24h = EXCLUDED.market_cap_change_24h,
+		market_cap_change_percentage_24h = EXCLUDED.market_cap_change_percentage_24h,
+		circulating_supply = EXCLUDED.circulating_supply,
+		total_supply = EXCLUDED.total_supply,
+		max_supply = EXCLUDED.max_supply,
+		ath = EXCLUDED.ath,
+		ath_change_percentage = EXCLUDED.ath_change_percentage,
+		ath_date = EXCLUDED.ath_date,
+		atl = EXCLUDED.atl,
+		atl_change_percentage = EXCLUDED.atl_change_percentage,
+		atl_date = EXCLUDED.atl_date,
+		roi = EXCLUDED.roi,
+		last_updated = EXCLUDED.last_updated,
+		data_fetched_at = NOW()`
 
 // MarketRepository defines the interface for database operations on coin market data.
 type MarketRepository interface {
@@ -29,126 +84,145 @@ func NewPostgresMarketRepository(db *sql.DB) *PostgresMarketRepository {
 	return &PostgresMarketRepository{db: db}
 }
 
+// upsertStatement builds a multi-row upsert for the given number of rows. Only $n placeholders
+// are generated; all values are bound parameters.
+func upsertStatement(rows int) string {
+	var b strings.Builder
+	b.WriteString("INSERT INTO coin_markets (" + upsertColumns + ") VALUES ")
+	for row := 0; row < rows; row++ {
+		if row > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("(")
+		for param := 0; param < upsertParamsPerRow; param++ {
+			if param > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString("$" + strconv.Itoa(row*upsertParamsPerRow+param+1))
+			if param == upsertRoiParam {
+				b.WriteString("::jsonb")
+			}
+		}
+		b.WriteString(", NOW())")
+	}
+	b.WriteString(upsertConflictClause)
+	return b.String()
+}
+
 // UpsertCoinMarkets inserts or updates multiple coin market data entries in the database.
-// It uses a transaction to ensure atomicity.
+// Rows are written with bounded multi-row statements inside one transaction, so the whole set
+// is applied atomically. If an id appears more than once the last occurrence wins.
 func (r *PostgresMarketRepository) UpsertCoinMarkets(ctx context.Context, markets []models.CoinMarket) error {
+	if len(markets) == 0 {
+		return nil
+	}
+
+	// A single INSERT ... ON CONFLICT cannot touch the same row twice.
+	unique := make([]models.CoinMarket, 0, len(markets))
+	position := make(map[string]int, len(markets))
+	for _, market := range markets {
+		if i, seen := position[market.ID]; seen {
+			unique[i] = market
+			continue
+		}
+		position[market.ID] = len(unique)
+		unique = append(unique, market)
+	}
+
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback() // Rollback if not committed
 
-	// Using a large VALUES clause for a single INSERT statement can be more efficient for many DBs than many individual INSERTs.
-	// However, PostgreSQL also handles prepared statements and individual upserts well.
-	// For clarity and to avoid overly complex string building for the VALUES clause with varying numbers of records,
-	// we prepare one statement and execute it multiple times within the transaction.
-	stmt, err := tx.PrepareContext(ctx, `
-		INSERT INTO coin_markets (
-			id, symbol, name, image, current_price, market_cap, market_cap_rank,
-			fully_diluted_valuation, total_volume, high_24h, low_24h,
-			price_change_24h, price_change_percentage_24h,
-			market_cap_change_24h, market_cap_change_percentage_24h,
-			circulating_supply, total_supply, max_supply, ath, ath_change_percentage, ath_date,
-			atl, atl_change_percentage, atl_date, roi, last_updated, data_fetched_at
-		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-			$18, $19, $20, $21, $22, $23, $24, $25, $26, NOW()
-		)
-		ON CONFLICT (id) DO UPDATE SET
-			symbol = EXCLUDED.symbol,
-			name = EXCLUDED.name,
-			image = EXCLUDED.image,
-			current_price = EXCLUDED.current_price,
-			market_cap = EXCLUDED.market_cap,
-			market_cap_rank = EXCLUDED.market_cap_rank,
-			fully_diluted_valuation = EXCLUDED.fully_diluted_valuation,
-			total_volume = EXCLUDED.total_volume,
-			high_24h = EXCLUDED.high_24h,
-			low_24h = EXCLUDED.low_24h,
-			price_change_24h = EXCLUDED.price_change_24h,
-			price_change_percentage_24h = EXCLUDED.price_change_percentage_24h,
-			market_cap_change_24h = EXCLUDED.market_cap_change_24h,
-			market_cap_change_percentage_24h = EXCLUDED.market_cap_change_percentage_24h,
-			circulating_supply = EXCLUDED.circulating_supply,
-			total_supply = EXCLUDED.total_supply,
-			max_supply = EXCLUDED.max_supply,
-			ath = EXCLUDED.ath,
-			ath_change_percentage = EXCLUDED.ath_change_percentage,
-			ath_date = EXCLUDED.ath_date,
-			atl = EXCLUDED.atl,
-			atl_change_percentage = EXCLUDED.atl_change_percentage,
-			atl_date = EXCLUDED.atl_date,
-			roi = EXCLUDED.roi,
-			last_updated = EXCLUDED.last_updated,
-			data_fetched_at = NOW();
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to prepare upsert statement: %w", err)
-	}
-	defer stmt.Close()
+	for start := 0; start < len(unique); start += upsertRowsPerStatement {
+		end := min(start+upsertRowsPerStatement, len(unique))
+		chunk := unique[start:end]
 
-	for _, market := range markets {
-		var roiJSONdriverValue driver.Value
-		if market.Roi != nil {
-			roiJSONdriverValue, err = market.Roi.Value() // Use the Value() method from RoiData
-			if err != nil {
-				return fmt.Errorf("failed to marshal ROI for market %s: %w", market.ID, err)
+		args := make([]any, 0, len(chunk)*upsertParamsPerRow)
+		for _, market := range chunk {
+			var roi any
+			if market.Roi != nil {
+				roiJSON, err := json.Marshal(market.Roi)
+				if err != nil {
+					return fmt.Errorf("failed to marshal ROI for market %s: %w", market.ID, err)
+				}
+				roi = string(roiJSON)
 			}
-		} else {
-			roiJSONdriverValue = nil // Explicitly nil if Roi is nil
+
+			args = append(args,
+				market.ID, market.Symbol, market.Name, market.Image, market.CurrentPrice, market.MarketCap, market.MarketCapRank,
+				market.FullyDilutedValuation, market.TotalVolume, market.High24h, market.Low24h,
+				market.PriceChange24h, market.PriceChangePercentage24h,
+				market.MarketCapChange24h, market.MarketCapChangePercentage24h,
+				market.CirculatingSupply, market.TotalSupply, market.MaxSupply, market.Ath, market.AthChangePercentage, market.AthDate,
+				market.Atl, market.AtlChangePercentage, market.AtlDate, roi, market.LastUpdated,
+			)
 		}
 
-		_, err := stmt.ExecContext(ctx,
-			market.ID, market.Symbol, market.Name, market.Image, market.CurrentPrice, market.MarketCap, market.MarketCapRank,
-			market.FullyDilutedValuation, market.TotalVolume, market.High24h, market.Low24h,
-			market.PriceChange24h, market.PriceChangePercentage24h,
-			market.MarketCapChange24h, market.MarketCapChangePercentage24h,
-			market.CirculatingSupply, market.TotalSupply, market.MaxSupply, market.Ath, market.AthChangePercentage, market.AthDate,
-			market.Atl, market.AtlChangePercentage, market.AtlDate, roiJSONdriverValue, market.LastUpdated,
-		)
-		if err != nil {
-			return fmt.Errorf("failed to execute upsert statement for market %s: %w", market.ID, err)
+		if _, err := tx.ExecContext(ctx, upsertStatement(len(chunk)), args...); err != nil {
+			return fmt.Errorf("failed to upsert markets %d-%d: %w", start, end-1, err)
 		}
 	}
 
 	return tx.Commit()
 }
 
-// GetCoinMarkets retrieves a paginated list of coin market data from the database.
-// It also returns the total count of records and the timestamp of the latest data fetch.
-func (r *PostgresMarketRepository) GetCoinMarkets(ctx context.Context, limit int, offset int, orderBy string, sortDirection string) ([]models.CoinMarket, int, time.Time, error) {
-	// Validate orderBy and sortDirection to prevent SQL injection if they were directly from user input
-	// For now, we assume they are controlled internally or validated upstream.
-	// Default ordering if not specified or invalid
-	if orderBy == "" {
+// orderableColumns are the columns a caller may sort by.
+var orderableColumns = map[string]bool{
+	"market_cap_rank": true, "id": true, "name": true, "current_price": true, "last_updated": true, "data_fetched_at": true,
+}
+
+// orderClause builds a deterministic ORDER BY body from a whitelisted column and direction.
+// prefix qualifies the columns (for example "page."). The id tiebreaker keeps pages stable.
+func orderClause(orderBy, sortDirection, prefix string) string {
+	orderBy = strings.ToLower(orderBy)
+	if !orderableColumns[orderBy] {
 		orderBy = "market_cap_rank"
 	}
-	validOrderBys := map[string]bool{"market_cap_rank": true, "id": true, "name": true, "current_price": true, "last_updated": true, "data_fetched_at": true}
-	if !validOrderBys[orderBy] {
-		orderBy = "market_cap_rank" // Default to a safe column
+
+	direction := "ASC"
+	if strings.EqualFold(sortDirection, "desc") {
+		direction = "DESC"
+	}
+	if orderBy == "market_cap_rank" {
+		// Unranked coins go last when ascending and first when descending.
+		if direction == "ASC" {
+			direction = "ASC NULLS LAST"
+		} else {
+			direction = "DESC NULLS FIRST"
+		}
 	}
 
-	if sortDirection == "" || (strings.ToUpper(sortDirection) != "ASC" && strings.ToUpper(sortDirection) != "DESC") {
-		sortDirection = "ASC"
-	}
-	if orderBy == "market_cap_rank" && strings.ToUpper(sortDirection) == "ASC" {
-		sortDirection = "ASC NULLS LAST" // Ensure nulls are at the end for market_cap_rank ASC
-	} else if orderBy == "market_cap_rank" && strings.ToUpper(sortDirection) == "DESC" {
-		sortDirection = "DESC NULLS FIRST" // Ensure nulls are at the beginning for market_cap_rank DESC
-	}
+	return fmt.Sprintf("%s%s %s, %sid ASC", prefix, orderBy, direction, prefix)
+}
 
+// GetCoinMarkets retrieves a paginated list of coin market data from the database.
+// It also returns the total count of records and the timestamp of the latest data fetch.
+// Everything comes from one statement, so the page, total and timestamp are mutually consistent
+// even while a refresh runs, and an empty table or an offset past the end still reports them.
+func (r *PostgresMarketRepository) GetCoinMarkets(ctx context.Context, limit int, offset int, orderBy string, sortDirection string) ([]models.CoinMarket, int, time.Time, error) {
+	// stats always yields exactly one row; LEFT JOIN keeps it when the page is empty.
+	// orderBy and sortDirection are normalized against a whitelist, never interpolated raw.
 	query := fmt.Sprintf(`
-		SELECT
-			id, symbol, name, image, current_price, market_cap, market_cap_rank,
-			fully_diluted_valuation, total_volume, high_24h, low_24h,
-			price_change_24h, price_change_percentage_24h,
-			market_cap_change_24h, market_cap_change_percentage_24h,
-			circulating_supply, total_supply, max_supply, ath, ath_change_percentage, ath_date,
-			atl, atl_change_percentage, atl_date, roi, last_updated, data_fetched_at
-		FROM coin_markets
-		ORDER BY %s %s
-		LIMIT $1 OFFSET $2;
-	`, orderBy, sortDirection)
+		WITH stats AS (
+			SELECT COUNT(*) AS total, MAX(data_fetched_at) AS latest_fetched_at
+			FROM coin_markets
+		), page AS (
+			SELECT %[1]s
+			FROM coin_markets
+			ORDER BY %[2]s
+			LIMIT $1 OFFSET $2
+		)
+		SELECT stats.total, stats.latest_fetched_at, %[3]s
+		FROM stats
+		LEFT JOIN page ON TRUE
+		ORDER BY %[4]s`,
+		upsertColumns,
+		orderClause(orderBy, sortDirection, ""),
+		pageSelectColumns,
+		orderClause(orderBy, sortDirection, "page."),
+	)
 
 	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
@@ -156,12 +230,21 @@ func (r *PostgresMarketRepository) GetCoinMarkets(ctx context.Context, limit int
 	}
 	defer rows.Close()
 
-	var markets []models.CoinMarket
+	var (
+		markets         []models.CoinMarket
+		total           int
+		latestFetchTime time.Time
+	)
 	for rows.Next() {
-		var market models.CoinMarket
-		var roiScannable models.RoiData // Use a temporary variable that implements sql.Scanner for market.Roi
+		var (
+			latest                  sql.NullTime
+			id, symbol, name, image sql.NullString
+			market                  models.CoinMarket
+			roiScannable            models.RoiData
+		)
 		if err := rows.Scan(
-			&market.ID, &market.Symbol, &market.Name, &market.Image, &market.CurrentPrice, &market.MarketCap, &market.MarketCapRank,
+			&total, &latest,
+			&id, &symbol, &name, &image, &market.CurrentPrice, &market.MarketCap, &market.MarketCapRank,
 			&market.FullyDilutedValuation, &market.TotalVolume, &market.High24h, &market.Low24h,
 			&market.PriceChange24h, &market.PriceChangePercentage24h,
 			&market.MarketCapChange24h, &market.MarketCapChangePercentage24h,
@@ -170,13 +253,16 @@ func (r *PostgresMarketRepository) GetCoinMarkets(ctx context.Context, limit int
 		); err != nil {
 			return nil, 0, time.Time{}, fmt.Errorf("failed to scan coin market row: %w", err)
 		}
-		// If roiScannable was successfully scanned (even if it results in an empty RoiData if DB was NULL for JSONB),
-		// assign it to market.Roi. If it was NULL in DB, roiScannable will be zero-value RoiData.
-		// We might need to explicitly check if the JSONB was NULL if we want market.Roi to be nil instead of an empty struct.
-		// For now, if JSONB is NULL, roiScannable.Scan should handle it (e.g., json.Unmarshal on null bytes might be fine or might need adjustment to set market.Roi = nil)
-		// Let's assume for now that if JSONB is NULL, roiScannable will be its zero value, and we assign its address if not zero.
-		// A better way: make roiScannable a *RoiData and let Scan handle nil.
-		// Or check if roiScannable is its zero value. For simplicity with the existing types.go:
+		if latest.Valid {
+			latestFetchTime = latest.Time
+		}
+
+		if !id.Valid {
+			continue // the LEFT JOIN row for an empty page carries only the statistics
+		}
+		market.ID, market.Symbol, market.Name, market.Image = id.String, symbol.String, name.String, image.String
+
+		// A NULL roi column leaves roiScannable at its zero value.
 		if roiScannable.Times != 0 || roiScannable.Percentage != 0 || roiScannable.Currency != "" {
 			market.Roi = &roiScannable
 		}
@@ -184,20 +270,6 @@ func (r *PostgresMarketRepository) GetCoinMarkets(ctx context.Context, limit int
 	}
 	if err = rows.Err(); err != nil {
 		return nil, 0, time.Time{}, fmt.Errorf("error iterating coin market rows: %w", err)
-	}
-
-	// Get total count for pagination
-	var total int
-	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM coin_markets").Scan(&total)
-	if err != nil {
-		return nil, 0, time.Time{}, fmt.Errorf("failed to query total coin markets count: %w", err)
-	}
-
-	// Get the latest data_fetched_at timestamp
-	latestFetchTime, err := r.GetLatestDataFetchedTimestamp(ctx)
-	if err != nil {
-		// Log error but don't fail the whole request if we have data
-		fmt.Printf("Warning: failed to get latest data fetched timestamp: %v\n", err)
 	}
 
 	return markets, total, latestFetchTime, nil

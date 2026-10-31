@@ -38,7 +38,7 @@ check_dependencies() {
     # Check for Air (for hot reloading)
     if ! command -v air &> /dev/null; then
         echo -e "${YELLOW}Warning: Air is not installed. Live-reload will not be available.${NC}"
-        echo -e "${YELLOW}Run 'go install github.com/air-verse/air@latest' to install it.${NC}"
+        echo -e "${YELLOW}Run 'go install github.com/air-verse/air@v1.63.0' to install it.${NC}"
     fi
 
     echo -e "${GREEN}All required dependencies are installed!${NC}"

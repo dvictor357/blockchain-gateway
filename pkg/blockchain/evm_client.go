@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync/atomic"
 )
@@ -42,62 +41,11 @@ func (c *EVMClient) Name() string {
 	return c.name
 }
 
-// Execute executes an RPC method on the EVM blockchain
+// Execute executes an RPC method on the EVM blockchain. The response must be a valid
+// JSON-RPC 2.0 envelope for this request; node-reported errors are returned as *RPCError.
 func (c *EVMClient) Execute(ctx context.Context, method string, params interface{}) (json.RawMessage, error) {
-	// Generate unique request ID
 	id := atomic.AddUint64(&c.requestID, 1)
-
-	// Create JSON-RPC request
-	request := map[string]interface{}{
-		"jsonrpc": "2.0",
-		"method":  method,
-		"params":  params,
-		"id":      id,
-	}
-
-	// Marshal request
-	requestBody, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Create HTTP request
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.rpcURL, strings.NewReader(string(requestBody)))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	// Execute HTTP request
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Parse response
-	var rpcResponse struct {
-		JSONRPC string          `json:"jsonrpc"`
-		Result  json.RawMessage `json:"result"`
-		Error   *struct {
-			Code    int    `json:"code"`
-			Message string `json:"message"`
-			Data    string `json:"data,omitempty"`
-		} `json:"error"`
-		ID uint64 `json:"id"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&rpcResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	// Check for RPC error
-	if rpcResponse.Error != nil {
-		return nil, fmt.Errorf("RPC error %d: %s", rpcResponse.Error.Code, rpcResponse.Error.Message)
-	}
-
-	return rpcResponse.Result, nil
+	return callJSONRPC(ctx, c.httpClient, c.rpcURL, "2.0", false, id, method, params)
 }
 
 // GetLatestBlockNumber returns the latest block number
@@ -108,57 +56,52 @@ func (c *EVMClient) GetLatestBlockNumber(ctx context.Context) (uint64, error) {
 	}
 
 	var blockNumberHex string
-	if err := json.Unmarshal(result, &blockNumberHex); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal block number: %w", err)
+	if err := decodeResult(result, &blockNumberHex, "block number"); err != nil {
+		return 0, err
 	}
 
-	blockNumber, err := parseHexToUint64(blockNumberHex)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse block number: %w", err)
-	}
-
-	return blockNumber, nil
+	return parseHexToUint64(blockNumberHex)
 }
 
-// GetBalance returns the balance of an address at a specific block
+// GetBalance returns the balance of an address at a specific block ("latest" when blockNumber is empty)
 func (c *EVMClient) GetBalance(ctx context.Context, address string, blockNumber string) (string, error) {
-	params := []interface{}{address, blockNumber}
+	params := []interface{}{address, normalizeBlockSelector(blockNumber)}
 	result, err := c.Execute(ctx, "eth_getBalance", params)
 	if err != nil {
 		return "", err
 	}
 
 	var balance string
-	if err := json.Unmarshal(result, &balance); err != nil {
-		return "", fmt.Errorf("failed to unmarshal balance: %w", err)
+	if err := decodeResult(result, &balance, "balance"); err != nil {
+		return "", err
 	}
 
 	return balance, nil
 }
 
-// GetTransactionCount returns the transaction count (nonce) for an address
+// GetTransactionCount returns the transaction count (nonce) for an address ("latest" when blockNumber is empty)
 func (c *EVMClient) GetTransactionCount(ctx context.Context, address string, blockNumber string) (uint64, error) {
-	params := []interface{}{address, blockNumber}
+	params := []interface{}{address, normalizeBlockSelector(blockNumber)}
 	result, err := c.Execute(ctx, "eth_getTransactionCount", params)
 	if err != nil {
 		return 0, err
 	}
 
 	var countHex string
-	if err := json.Unmarshal(result, &countHex); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal transaction count: %w", err)
+	if err := decodeResult(result, &countHex, "transaction count"); err != nil {
+		return 0, err
 	}
 
-	count, err := parseHexToUint64(countHex)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse transaction count: %w", err)
-	}
-
-	return count, nil
+	return parseHexToUint64(countHex)
 }
 
-// SendRawTransaction broadcasts a signed transaction
+// SendRawTransaction broadcasts a signed transaction; the data is sent with a 0x prefix.
 func (c *EVMClient) SendRawTransaction(ctx context.Context, signedTxData string) (string, error) {
+	signedTxData = normalizeHexPrefix(signedTxData)
+	if signedTxData == "0x" {
+		return "", fmt.Errorf("%w: signed transaction data is empty", ErrInvalidRequest)
+	}
+
 	params := []interface{}{signedTxData}
 	result, err := c.Execute(ctx, "eth_sendRawTransaction", params)
 	if err != nil {
@@ -166,19 +109,27 @@ func (c *EVMClient) SendRawTransaction(ctx context.Context, signedTxData string)
 	}
 
 	var txHash string
-	if err := json.Unmarshal(result, &txHash); err != nil {
-		return "", fmt.Errorf("failed to unmarshal transaction hash: %w", err)
+	if err := decodeResult(result, &txHash, "transaction hash"); err != nil {
+		return "", err
 	}
 
 	return txHash, nil
 }
 
-// parseHexToUint64 converts a hex string to uint64
-func parseHexToUint64(hexStr string) (uint64, error) {
-	// Remove 0x prefix if present
-	if strings.HasPrefix(hexStr, "0x") {
-		hexStr = strings.TrimPrefix(hexStr, "0x")
+// normalizeBlockSelector defaults an empty block selector to "latest".
+func normalizeBlockSelector(blockNumber string) string {
+	blockNumber = strings.TrimSpace(blockNumber)
+	if blockNumber == "" {
+		return "latest"
 	}
+	return blockNumber
+}
 
-	return strconv.ParseUint(hexStr, 16, 64)
+// normalizeHexPrefix trims whitespace and ensures a lowercase 0x prefix.
+func normalizeHexPrefix(data string) string {
+	data = strings.TrimSpace(data)
+	if len(data) >= 2 && data[0] == '0' && (data[1] == 'x' || data[1] == 'X') {
+		data = data[2:]
+	}
+	return "0x" + data
 }
