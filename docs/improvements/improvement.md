@@ -38,7 +38,7 @@ Perfect! I've thoroughly analyzed the blockchain gateway project. Here's a compr
 **Architecture Pattern: Layered Clean Architecture with Dependency Injection**
 
 The project follows a well-structured layered architecture:
-- **CMD Layer** (Entry Point): `/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go`
+- **CMD Layer** (Entry Point): `cmd/server/main.go`
 - **PKG Layer** (Core Logic): Organized by domains (api, blockchain, config, database, marketdata, models, validation)
 - **External Dependencies**: Isolated in specific packages (coingecko, database)
 
@@ -53,7 +53,7 @@ The project follows a well-structured layered architecture:
 ## **2. Main Directories and Their Purposes**
 
 ```
-/Users/dvictor/Projects/web3/blockchain-gateway/
+.
 ├── cmd/server/           # Application entry point
 │   └── main.go          # Main server initialization (lines 53-214)
 ├── pkg/
@@ -95,7 +95,7 @@ The project follows a well-structured layered architecture:
 
 ## **3. Key Configuration Files and Purposes**
 
-**Configuration Structure** (`/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go:31-88`):
+**Configuration Structure** (`pkg/config/config.go:31-88`):
 
 ```go
 // Server Configuration
@@ -132,7 +132,7 @@ type ChainsConfig struct {
 
 ## **4. Entry Points and Main Components**
 
-**Main Entry Point** (`/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:53-214`):
+**Main Entry Point** (`cmd/server/main.go:53-214`):
 1. Loads environment variables (line 54)
 2. Loads configuration (line 59)
 3. Initializes logger (line 61)
@@ -144,7 +144,7 @@ type ChainsConfig struct {
 9. Registers API routes (line 125)
 10. Starts HTTP server (line 171)
 
-**API Routes** (`/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:29-390`):
+**API Routes** (`pkg/api/handler.go:29-390`):
 - `GET /health` - Health check
 - `GET /api/v1/chains` - List supported chains
 - `POST /api/v1/chains/{chain}/query` - Execute RPC query on specific chain
@@ -181,11 +181,11 @@ type ChainsConfig struct {
 - **Separation of Concerns**: Clear boundaries between HTTP, business logic, and data access
 
 **Testing Coverage** (5 test files):
-- `/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler_test.go`
-- `/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors_test.go`
-- `/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client_test.go`
-- `/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/api_config_test.go`
-- `/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator_test.go`
+- `pkg/api/handler_test.go`
+- `pkg/api/errors_test.go`
+- `pkg/blockchain/evm_client_test.go`
+- `pkg/config/api_config_test.go`
+- `pkg/validation/validator_test.go`
 
 **Code Quality Features**:
 - Swagger documentation annotations on all handlers
@@ -287,21 +287,21 @@ CREATE TABLE coin_markets (
 
 This is a **well-architected** blockchain gateway service with clean separation of concerns, good test coverage, and production-ready features. The codebase demonstrates solid Go practices with dependency injection, interface-based design, and comprehensive error handling. The main areas for improvement are around distributed system concerns (rate limiting, caching) and resilience patterns for external RPC calls.
 
-**Tool Call: `find /Users/dvictor/Projects/web3/blockchain-gateway -type f -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" -o -name "*.config.*" | head -20`**
+**Tool Call: `find . -type f -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.toml" -o -name "*.config.*" | head -20`**
 Status: Failed
 
 ```
 <tool_use_error>Error: No such tool available: Bash</tool_use_error>
 ```
 
-**Tool Call: `ls -la /Users/dvictor/Projects/web3/blockchain-gateway`**
+**Tool Call: `ls -la .`**
 Status: Failed
 
 ```
 <tool_use_error>Error: No such tool available: Bash</tool_use_error>
 ```
 
-**Tool Call: `find /Users/dvictor/Projects/web3/blockchain-gateway -type d -maxdepth 2 | sort`**
+**Tool Call: `find . -type d -maxdepth 2 | sort`**
 Status: Failed
 
 ```
@@ -311,13 +311,13 @@ Status: Failed
 **Tool Call: Find `*`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md
-/Users/dvictor/Projects/web3/blockchain-gateway/dev.sh
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod
-/Users/dvictor/Projects/web3/blockchain-gateway/go.sum
+Dockerfile
+Makefile
+README.md
+dev.sh
+docker-compose.yml
+go.mod
+go.sum
 
 **Tool Call: Find `**/package.json`**
 Status: Completed
@@ -332,44 +332,44 @@ No files found
 **Tool Call: Find `**/*.yaml`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml
+docs/swagger.yaml
 
 **Tool Call: Find `**/*.yml`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml
+docker-compose.yml
 
 **Tool Call: Find `**/*.go`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/common.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/ethereum.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/polygon.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/coingecko/client.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/api_config.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/api_config_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/database/db.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/docs.go
+cmd/server/main.go
+pkg/api/errors.go
+pkg/api/errors_test.go
+pkg/api/handler.go
+pkg/api/handler_test.go
+pkg/api/middleware.go
+pkg/api/responses.go
+pkg/blockchain/bitcoin.go
+pkg/blockchain/chains.go
+pkg/blockchain/client_manager.go
+pkg/blockchain/common.go
+pkg/blockchain/ethereum.go
+pkg/blockchain/evm_client.go
+pkg/blockchain/evm_client_test.go
+pkg/blockchain/polygon.go
+pkg/coingecko/client.go
+pkg/config/api_config.go
+pkg/config/api_config_test.go
+pkg/config/config.go
+pkg/database/db.go
+pkg/marketdata/repository.go
+pkg/marketdata/service.go
+pkg/models/market_types.go
+pkg/validation/validator.go
+pkg/validation/validator_test.go
+docs/docs.go
 
-**Tool Call: `tree /Users/dvictor/Projects/web3/blockchain-gateway -I 'node_modules|.git|vendor' -L 3`**
+**Tool Call: `tree . -I 'node_modules|.git|vendor' -L 3`**
 Status: Failed
 
 ```
@@ -389,17 +389,17 @@ No files found
 **Tool Call: Find `**/.env*`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development
+.env.development
 
 **Tool Call: Find `**/config*`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go
+pkg/config/config.go
 
 **Tool Call: Find `cmd/**`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go
+cmd/server/main.go
 
 **Tool Call: Find `internal/**`**
 Status: Completed
@@ -409,758 +409,758 @@ No files found
 **Tool Call: grep --include="README.md" "^# "**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Blockchain Gateway
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Building from source
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Clone the repository
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Build the project
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Run the server
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Install Air (specific version for compatibility)
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Or manually install: go install github.com/air-verse/air@latest
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Run with Air for live-reloading
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Build the Docker image
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Run the container
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Start the development environment with hot-reloading
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Access the API at http://localhost:8080
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Start the production container
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Access the API at http://localhost:8081
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Build development image
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Build production image
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Show all available commands
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Build the application
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Run tests
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Format code
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Install Air (specific version v1.40.4)
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Run with live-reloading (Air)
+README.md:# Blockchain Gateway
+README.md:# Building from source
+README.md:# Clone the repository
+README.md:# Build the project
+README.md:# Run the server
+README.md:# Install Air (specific version for compatibility)
+README.md:# Or manually install: go install github.com/air-verse/air@latest
+README.md:# Run with Air for live-reloading
+README.md:# Build the Docker image
+README.md:# Run the container
+README.md:# Start the development environment with hot-reloading
+README.md:# Access the API at http://localhost:8080
+README.md:# Start the production container
+README.md:# Access the API at http://localhost:8081
+README.md:# Build development image
+README.md:# Build production image
+README.md:# Show all available commands
+README.md:# Build the application
+README.md:# Run tests
+README.md:# Format code
+README.md:# Install Air (specific version v1.40.4)
+README.md:# Run with live-reloading (Air)
 
 **Tool Call: Find `**/*README.md`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md
+README.md
 
 **Tool Call: grep -n --include="**/go.mod" "^(module|require|go )"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:1:module github.com/dvictor357/blockchain-gateway
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:3:go 1.24.3
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:5:require (
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:16:require (
+go.mod:1:module github.com/dvictor357/blockchain-gateway
+go.mod:3:go 1.24.3
+go.mod:5:require (
+go.mod:16:require (
 
 **Tool Call: grep --include="**/go.mod" "github\.com|golang\.org|bitbucket\.org|gopkg\.in"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:module github.com/dvictor357/blockchain-gateway
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/gin-gonic/gin v1.10.1
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/joho/godotenv v1.5.1
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/lib/pq v1.10.9
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/robfig/cron/v3 v3.0.1
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/stretchr/testify v1.10.0
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/swaggo/files v1.0.1
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/swaggo/gin-swagger v1.6.0
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/swaggo/swag v1.16.4
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/KyleBanks/depth v1.2.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/bytedance/sonic v1.13.2 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/bytedance/sonic/loader v0.2.4 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/cloudwego/base64x v0.1.5 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/davecgh/go-spew v1.1.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/gin-contrib/sse v1.1.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-openapi/jsonpointer v0.21.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-openapi/jsonreference v0.21.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-openapi/spec v0.21.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-openapi/swag v0.23.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-playground/locales v0.14.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-playground/universal-translator v0.18.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/go-playground/validator/v10 v10.26.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/goccy/go-json v0.10.5 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/josharian/intern v1.0.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/json-iterator/go v1.1.12 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/leodido/go-urn v1.4.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/mailru/easyjson v0.9.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/mattn/go-isatty v0.0.20 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/modern-go/reflect2 v1.0.2 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/pmezard/go-difflib v1.0.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/stretchr/objx v0.5.2 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	github.com/ugorji/go/codec v1.2.12 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	golang.org/x/arch v0.17.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	golang.org/x/crypto v0.38.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	golang.org/x/net v0.40.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	golang.org/x/sys v0.33.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	golang.org/x/text v0.25.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	golang.org/x/tools v0.33.0 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	google.golang.org/protobuf v1.36.6 // indirect
-/Users/dvictor/Projects/web3/blockchain-gateway/go.mod:	gopkg.in/yaml.v3 v3.0.1 // indirect
+go.mod:module github.com/dvictor357/blockchain-gateway
+go.mod:	github.com/gin-gonic/gin v1.10.1
+go.mod:	github.com/joho/godotenv v1.5.1
+go.mod:	github.com/lib/pq v1.10.9
+go.mod:	github.com/robfig/cron/v3 v3.0.1
+go.mod:	github.com/stretchr/testify v1.10.0
+go.mod:	github.com/swaggo/files v1.0.1
+go.mod:	github.com/swaggo/gin-swagger v1.6.0
+go.mod:	github.com/swaggo/swag v1.16.4
+go.mod:	github.com/KyleBanks/depth v1.2.1 // indirect
+go.mod:	github.com/bytedance/sonic v1.13.2 // indirect
+go.mod:	github.com/bytedance/sonic/loader v0.2.4 // indirect
+go.mod:	github.com/cloudwego/base64x v0.1.5 // indirect
+go.mod:	github.com/davecgh/go-spew v1.1.1 // indirect
+go.mod:	github.com/gabriel-vasile/mimetype v1.4.9 // indirect
+go.mod:	github.com/gin-contrib/sse v1.1.0 // indirect
+go.mod:	github.com/go-openapi/jsonpointer v0.21.1 // indirect
+go.mod:	github.com/go-openapi/jsonreference v0.21.0 // indirect
+go.mod:	github.com/go-openapi/spec v0.21.0 // indirect
+go.mod:	github.com/go-openapi/swag v0.23.1 // indirect
+go.mod:	github.com/go-playground/locales v0.14.1 // indirect
+go.mod:	github.com/go-playground/universal-translator v0.18.1 // indirect
+go.mod:	github.com/go-playground/validator/v10 v10.26.0 // indirect
+go.mod:	github.com/goccy/go-json v0.10.5 // indirect
+go.mod:	github.com/josharian/intern v1.0.0 // indirect
+go.mod:	github.com/json-iterator/go v1.1.12 // indirect
+go.mod:	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
+go.mod:	github.com/leodido/go-urn v1.4.0 // indirect
+go.mod:	github.com/mailru/easyjson v0.9.0 // indirect
+go.mod:	github.com/mattn/go-isatty v0.0.20 // indirect
+go.mod:	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+go.mod:	github.com/modern-go/reflect2 v1.0.2 // indirect
+go.mod:	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
+go.mod:	github.com/pmezard/go-difflib v1.0.0 // indirect
+go.mod:	github.com/stretchr/objx v0.5.2 // indirect
+go.mod:	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+go.mod:	github.com/ugorji/go/codec v1.2.12 // indirect
+go.mod:	golang.org/x/arch v0.17.0 // indirect
+go.mod:	golang.org/x/crypto v0.38.0 // indirect
+go.mod:	golang.org/x/net v0.40.0 // indirect
+go.mod:	golang.org/x/sys v0.33.0 // indirect
+go.mod:	golang.org/x/text v0.25.0 // indirect
+go.mod:	golang.org/x/tools v0.33.0 // indirect
+go.mod:	google.golang.org/protobuf v1.36.6 // indirect
+go.mod:	gopkg.in/yaml.v3 v3.0.1 // indirect
 
 **Tool Call: Find `**/main.go`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go
+cmd/server/main.go
 
 **Tool Call: grep -n -C 3 --include="**/main.go" "^func main|log\.|gin\.|config|Initialize|Setup|Run"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-41-	"github.com/dvictor357/blockchain-gateway/pkg/api"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-42-	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-43-	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:44:	"github.com/dvictor357/blockchain-gateway/pkg/config"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-45-	"github.com/dvictor357/blockchain-gateway/pkg/database"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-46-	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-47-	"github.com/gin-gonic/gin"
+cmd/server/main.go-41-	"github.com/dvictor357/blockchain-gateway/pkg/api"
+cmd/server/main.go-42-	"github.com/dvictor357/blockchain-gateway/pkg/blockchain"
+cmd/server/main.go-43-	"github.com/dvictor357/blockchain-gateway/pkg/coingecko"
+cmd/server/main.go:44:	"github.com/dvictor357/blockchain-gateway/pkg/config"
+cmd/server/main.go-45-	"github.com/dvictor357/blockchain-gateway/pkg/database"
+cmd/server/main.go-46-	"github.com/dvictor357/blockchain-gateway/pkg/marketdata"
+cmd/server/main.go-47-	"github.com/gin-gonic/gin"
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-50-	ginSwagger "github.com/swaggo/gin-swagger"
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-51-)
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-52-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:53:func main() {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-54-	err := godotenv.Load()
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-55-	if err != nil {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:56:		log.Fatal("Error loading .env file")
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-57-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-58-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:59:	appConfig := config.LoadConfig()
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-60-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:61:	logger := log.New(os.Stdout, "[BLOCKCHAIN-GATEWAY] ", log.LstdFlags|log.Lshortfile)
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-62-	logger.Printf("Starting blockchain RPC gateway service with log level: %s...", appConfig.LogLevel)
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-63-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-64-	startupMessage := `
+cmd/server/main.go-50-	ginSwagger "github.com/swaggo/gin-swagger"
+cmd/server/main.go-51-)
+cmd/server/main.go-52-
+cmd/server/main.go:53:func main() {
+cmd/server/main.go-54-	err := godotenv.Load()
+cmd/server/main.go-55-	if err != nil {
+cmd/server/main.go:56:		log.Fatal("Error loading .env file")
+cmd/server/main.go-57-	}
+cmd/server/main.go-58-
+cmd/server/main.go:59:	appConfig := config.LoadConfig()
+cmd/server/main.go-60-
+cmd/server/main.go:61:	logger := log.New(os.Stdout, "[BLOCKCHAIN-GATEWAY] ", log.LstdFlags|log.Lshortfile)
+cmd/server/main.go-62-	logger.Printf("Starting blockchain RPC gateway service with log level: %s...", appConfig.LogLevel)
+cmd/server/main.go-63-
+cmd/server/main.go-64-	startupMessage := `
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-86-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-87-	defer db.Close()
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-88-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:89:	if err := database.RunMigrations(db, appConfig.MigrationsDir); err != nil {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-90-		logger.Fatalf("Failed to run database migrations: %v", err)
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-91-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-92-	logger.Println("Database migrations completed successfully.")
+cmd/server/main.go-86-	}
+cmd/server/main.go-87-	defer db.Close()
+cmd/server/main.go-88-
+cmd/server/main.go:89:	if err := database.RunMigrations(db, appConfig.MigrationsDir); err != nil {
+cmd/server/main.go-90-		logger.Fatalf("Failed to run database migrations: %v", err)
+cmd/server/main.go-91-	}
+cmd/server/main.go-92-	logger.Println("Database migrations completed successfully.")
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-116-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-117-	apiHandler := api.NewHandler(clientManager, logger, marketServ)
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-118-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:119:	gin.SetMode(appConfig.Server.GinMode)
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:120:	router := gin.New()
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:121:	router.Use(gin.Recovery())
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-122-	router.Use(api.LoggingMiddleware(logger))
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-123-	router.Use(api.RateLimit(appConfig.Server.RateLimit))
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-124-
+cmd/server/main.go-116-
+cmd/server/main.go-117-	apiHandler := api.NewHandler(clientManager, logger, marketServ)
+cmd/server/main.go-118-
+cmd/server/main.go:119:	gin.SetMode(appConfig.Server.GinMode)
+cmd/server/main.go:120:	router := gin.New()
+cmd/server/main.go:121:	router.Use(gin.Recovery())
+cmd/server/main.go-122-	router.Use(api.LoggingMiddleware(logger))
+cmd/server/main.go-123-	router.Use(api.RateLimit(appConfig.Server.RateLimit))
+cmd/server/main.go-124-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-127-	// Swagger documentation endpoint
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-128-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-129-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:130:	if gin.Mode() == gin.DebugMode {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:131:		router.Use(gin.Logger())
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:132:		logger.Println("Running in development mode (debug) with enhanced logging")
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-133-
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:134:		router.GET("/debug/routes", func(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-135-			routes := []string{}
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-136-			for _, r := range router.Routes() {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-137-				routes = append(routes, fmt.Sprintf("%s %s", r.Method, r.Path))
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-138-			}
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:139:			c.JSON(http.StatusOK, gin.H{
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-140-				"routes": routes,
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-141-				"count":  len(routes),
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:142:				"mode":   gin.Mode(),
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-143-			})
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-144-		})
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-145-	}
+cmd/server/main.go-127-	// Swagger documentation endpoint
+cmd/server/main.go-128-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+cmd/server/main.go-129-
+cmd/server/main.go:130:	if gin.Mode() == gin.DebugMode {
+cmd/server/main.go:131:		router.Use(gin.Logger())
+cmd/server/main.go:132:		logger.Println("Running in development mode (debug) with enhanced logging")
+cmd/server/main.go-133-
+cmd/server/main.go:134:		router.GET("/debug/routes", func(c *gin.Context) {
+cmd/server/main.go-135-			routes := []string{}
+cmd/server/main.go-136-			for _, r := range router.Routes() {
+cmd/server/main.go-137-				routes = append(routes, fmt.Sprintf("%s %s", r.Method, r.Path))
+cmd/server/main.go-138-			}
+cmd/server/main.go:139:			c.JSON(http.StatusOK, gin.H{
+cmd/server/main.go-140-				"routes": routes,
+cmd/server/main.go-141-				"count":  len(routes),
+cmd/server/main.go:142:				"mode":   gin.Mode(),
+cmd/server/main.go-143-			})
+cmd/server/main.go-144-		})
+cmd/server/main.go-145-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-161-	readTimeout := 15 * time.Second
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-162-	writeTimeout := 15 * time.Second
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-163-	idleTimeout := 60 * time.Second
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:164:	if gin.Mode() == gin.DebugMode {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-165-		readTimeout = 30 * time.Second
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-166-		writeTimeout = 30 * time.Second
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-167-		idleTimeout = 120 * time.Second
+cmd/server/main.go-161-	readTimeout := 15 * time.Second
+cmd/server/main.go-162-	writeTimeout := 15 * time.Second
+cmd/server/main.go-163-	idleTimeout := 60 * time.Second
+cmd/server/main.go:164:	if gin.Mode() == gin.DebugMode {
+cmd/server/main.go-165-		readTimeout = 30 * time.Second
+cmd/server/main.go-166-		writeTimeout = 30 * time.Second
+cmd/server/main.go-167-		idleTimeout = 120 * time.Second
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-205-// @Produce      json
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-206-// @Success      200  {object}  api.HealthResponse
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-207-// @Router       /health [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go:208:func healthCheckHandler(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-209-	c.JSON(http.StatusOK, api.HealthResponse{
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-210-		Status: "ok",
-/Users/dvictor/Projects/web3/blockchain-gateway/cmd/server/main.go-211-		Time:   time.Now().Format(time.RFC3339),
+cmd/server/main.go-205-// @Produce      json
+cmd/server/main.go-206-// @Success      200  {object}  api.HealthResponse
+cmd/server/main.go-207-// @Router       /health [get]
+cmd/server/main.go:208:func healthCheckHandler(c *gin.Context) {
+cmd/server/main.go-209-	c.JSON(http.StatusOK, api.HealthResponse{
+cmd/server/main.go-210-		Status: "ok",
+cmd/server/main.go-211-		Time:   time.Now().Format(time.RFC3339),
 
 **Tool Call: Find `**/.env*`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development
+.env.development
 
 **Tool Call: grep --include="**.env.development" ".*"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Server Configuration
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:PORT=8080
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:GIN_MODE=debug
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:LOG_LEVEL=debug
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:RATE_LIMIT=120
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Blockchain RPC Endpoints (using public nodes as examples)
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BTC
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:BTC_RPC_URL=https://btc.getblock.io/mainnet
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Ethereum
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:ETH_RPC_URL=https://ethereum-rpc.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ETH_RPC_URL=https://rpc.ankr.com/eth
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ETH_RPC_URL=https://eth.llamarpc.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BSC
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:BSC_RPC_URL=https://bsc-rpc.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BSC_RPC_URL=https://bsc-dataseed1.defibit.io
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BSC_RPC_URL=https://bsc-dataseed1.ninicoin.io
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Polygon
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:POLYGON_RPC_URL=https://polygon-bor-rpc.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# POLYGON_RPC_URL=https://polygon-rpc.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# POLYGON_RPC_URL=https://rpc-mainnet.matic.network
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Arbitrum
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:ARBITRUM_RPC_URL=https://arbitrum-one-rpc.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ARBITRUM_RPC_URL=https://rpc.ankr.com/arbitrum
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ARBITRUM_RPC_URL=https://arbitrum-one.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Optimism
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:OPTIMISM_RPC_URL=https://optimism-rpc.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# OPTIMISM_RPC_URL=https://rpc.ankr.com/optimism
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# OPTIMISM_RPC_URL=https://optimism.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Base
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:BASE_RPC_URL=https://base-rpc.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BASE_RPC_URL=https://rpc.ankr.com/base
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BASE_RPC_URL=https://base.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# For alternatives, you might want to consider using paid API
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Avalanche Alternatives
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# AVALANCHE_RPC_URL=https://rpc.ankr.com/avalanche
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# AVALANCHE_RPC_URL=https://avalanche-c-chain.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Fantom Alternatives
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# FANTOM_RPC_URL=https://rpc.ankr.com/fantom
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# FANTOM_RPC_URL=https://rpc2.fantom.network
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Alchemy (Replace YOUR_API_KEY)
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ETH_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ARBITRUM_RPC_URL=https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# OPTIMISM_RPC_URL=https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Infura (Replace YOUR_PROJECT_ID)
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ETH_RPC_URL=https://mainnet.infura.io/v3/YOUR_PROJECT_ID
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# POLYGON_RPC_URL=https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ARBITRUM_RPC_URL=https://arbitrum-mainnet.infura.io/v3/YOUR_PROJECT_ID
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# OPTIMISM_RPC_URL=https://optimism-mainnet.infura.io/v3/YOUR_PROJECT_ID
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# AVALANCHE_RPC_URL=https://avalanche-mainnet.infura.io/v3/YOUR_PROJECT_ID
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# QuickNode (Replace YOUR_ENDPOINT)
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ETH_RPC_URL=https://YOUR_ENDPOINT.ethereum.quiknode.pro
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# BSC_RPC_URL=https://YOUR_ENDPOINT.bsc.quiknode.pro
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# POLYGON_RPC_URL=https://YOUR_ENDPOINT.matic.quiknode.pro
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# ARBITRUM_RPC_URL=https://YOUR_ENDPOINT.arbitrum-mainnet.quiknode.pro
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# AVALANCHE_RPC_URL=https://YOUR_ENDPOINT.avalanche-mainnet.quiknode.pro
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# Default Request Timeout for RPC clients (seconds)
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:REQUEST_TIMEOUT=30
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:BATCH_REQUEST_TIMEOUT=120
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# PostgreSQL Database Configuration
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:DB_HOST=localhost
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:DB_PORT=5432
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:DB_USER=your_db_user
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:DB_PASSWORD=your_db_password
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:DB_NAME=blockchain_gateway
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:DB_SSLMODE=disable
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:# CoinGecko Market Data Fetcher Configuration
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:COINGECKO_PER_PAGE=100
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:COINGECKO_ORDER=market_cap_desc
-/Users/dvictor/Projects/web3/blockchain-gateway/.env.development:COINGECKO_VS_CURRENCY=usd
+.env.development:# Server Configuration
+.env.development:PORT=8080
+.env.development:GIN_MODE=debug
+.env.development:LOG_LEVEL=debug
+.env.development:RATE_LIMIT=120
+.env.development:
+.env.development:# Blockchain RPC Endpoints (using public nodes as examples)
+.env.development:
+.env.development:# BTC
+.env.development:BTC_RPC_URL=https://btc.getblock.io/mainnet
+.env.development:
+.env.development:# Ethereum
+.env.development:ETH_RPC_URL=https://ethereum-rpc.publicnode.com
+.env.development:# ETH_RPC_URL=https://rpc.ankr.com/eth
+.env.development:# ETH_RPC_URL=https://eth.llamarpc.com
+.env.development:
+.env.development:# BSC
+.env.development:BSC_RPC_URL=https://bsc-rpc.publicnode.com
+.env.development:# BSC_RPC_URL=https://bsc-dataseed1.defibit.io
+.env.development:# BSC_RPC_URL=https://bsc-dataseed1.ninicoin.io
+.env.development:
+.env.development:# Polygon
+.env.development:POLYGON_RPC_URL=https://polygon-bor-rpc.publicnode.com
+.env.development:# POLYGON_RPC_URL=https://polygon-rpc.com
+.env.development:# POLYGON_RPC_URL=https://rpc-mainnet.matic.network
+.env.development:
+.env.development:# Arbitrum
+.env.development:ARBITRUM_RPC_URL=https://arbitrum-one-rpc.publicnode.com
+.env.development:# ARBITRUM_RPC_URL=https://rpc.ankr.com/arbitrum
+.env.development:# ARBITRUM_RPC_URL=https://arbitrum-one.publicnode.com
+.env.development:
+.env.development:# Optimism
+.env.development:OPTIMISM_RPC_URL=https://optimism-rpc.publicnode.com
+.env.development:# OPTIMISM_RPC_URL=https://rpc.ankr.com/optimism
+.env.development:# OPTIMISM_RPC_URL=https://optimism.publicnode.com
+.env.development:
+.env.development:# Base
+.env.development:BASE_RPC_URL=https://base-rpc.publicnode.com
+.env.development:# BASE_RPC_URL=https://rpc.ankr.com/base
+.env.development:# BASE_RPC_URL=https://base.publicnode.com
+.env.development:
+.env.development:# For alternatives, you might want to consider using paid API
+.env.development:# Avalanche Alternatives
+.env.development:# AVALANCHE_RPC_URL=https://rpc.ankr.com/avalanche
+.env.development:# AVALANCHE_RPC_URL=https://avalanche-c-chain.publicnode.com
+.env.development:
+.env.development:# Fantom Alternatives
+.env.development:# FANTOM_RPC_URL=https://rpc.ankr.com/fantom
+.env.development:# FANTOM_RPC_URL=https://rpc2.fantom.network
+.env.development:
+.env.development:# Alchemy (Replace YOUR_API_KEY)
+.env.development:# ETH_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+.env.development:# POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+.env.development:# ARBITRUM_RPC_URL=https://arb-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+.env.development:# OPTIMISM_RPC_URL=https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+.env.development:# BASE_RPC_URL=https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+.env.development:
+.env.development:# Infura (Replace YOUR_PROJECT_ID)
+.env.development:# ETH_RPC_URL=https://mainnet.infura.io/v3/YOUR_PROJECT_ID
+.env.development:# POLYGON_RPC_URL=https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID
+.env.development:# ARBITRUM_RPC_URL=https://arbitrum-mainnet.infura.io/v3/YOUR_PROJECT_ID
+.env.development:# OPTIMISM_RPC_URL=https://optimism-mainnet.infura.io/v3/YOUR_PROJECT_ID
+.env.development:# AVALANCHE_RPC_URL=https://avalanche-mainnet.infura.io/v3/YOUR_PROJECT_ID
+.env.development:
+.env.development:# QuickNode (Replace YOUR_ENDPOINT)
+.env.development:# ETH_RPC_URL=https://YOUR_ENDPOINT.ethereum.quiknode.pro
+.env.development:# BSC_RPC_URL=https://YOUR_ENDPOINT.bsc.quiknode.pro
+.env.development:# POLYGON_RPC_URL=https://YOUR_ENDPOINT.matic.quiknode.pro
+.env.development:# ARBITRUM_RPC_URL=https://YOUR_ENDPOINT.arbitrum-mainnet.quiknode.pro
+.env.development:# AVALANCHE_RPC_URL=https://YOUR_ENDPOINT.avalanche-mainnet.quiknode.pro
+.env.development:
+.env.development:# Default Request Timeout for RPC clients (seconds)
+.env.development:REQUEST_TIMEOUT=30
+.env.development:BATCH_REQUEST_TIMEOUT=120
+.env.development:
+.env.development:# PostgreSQL Database Configuration
+.env.development:DB_HOST=localhost
+.env.development:DB_PORT=5432
+.env.development:DB_USER=your_db_user
+.env.development:DB_PASSWORD=your_db_password
+.env.development:DB_NAME=blockchain_gateway
+.env.development:DB_SSLMODE=disable
+.env.development:
+.env.development:# CoinGecko Market Data Fetcher Configuration
+.env.development:COINGECKO_BASE_URL=https://api.coingecko.com/api/v3
+.env.development:COINGECKO_PER_PAGE=100
+.env.development:COINGECKO_ORDER=market_cap_desc
+.env.development:COINGECKO_VS_CURRENCY=usd
 
 **Tool Call: grep -n -C 5 --include="**/config.go" "type Config|type ServerConfig|type DatabaseConfig|LoadConfig"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-27-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-28-	migrationsDir = "migrations"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-29-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-30-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-31-// ServerConfig holds server-specific configurations
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go:32:type ServerConfig struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-33-	Port      string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-34-	Host      string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-35-	GinMode   string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-36-	RateLimit int
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-37-	// RequestTimeout time.Duration // For http.Server, if needed directly here
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-38-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-39-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-40-// DatabaseConfig holds database connection parameters
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go:41:type DatabaseConfig struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-42-	Host     string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-43-	Port     string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-44-	User     string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-45-	Password string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-46-	DBName   string
+pkg/config/config.go-27-
+pkg/config/config.go-28-	migrationsDir = "migrations"
+pkg/config/config.go-29-)
+pkg/config/config.go-30-
+pkg/config/config.go-31-// ServerConfig holds server-specific configurations
+pkg/config/config.go:32:type ServerConfig struct {
+pkg/config/config.go-33-	Port      string
+pkg/config/config.go-34-	Host      string
+pkg/config/config.go-35-	GinMode   string
+pkg/config/config.go-36-	RateLimit int
+pkg/config/config.go-37-	// RequestTimeout time.Duration // For http.Server, if needed directly here
+pkg/config/config.go-38-}
+pkg/config/config.go-39-
+pkg/config/config.go-40-// DatabaseConfig holds database connection parameters
+pkg/config/config.go:41:type DatabaseConfig struct {
+pkg/config/config.go-42-	Host     string
+pkg/config/config.go-43-	Port     string
+pkg/config/config.go-44-	User     string
+pkg/config/config.go-45-	Password string
+pkg/config/config.go-46-	DBName   string
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-82-	Chains        ChainsConfig
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-83-	LogLevel      string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-84-	MigrationsDir string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-85-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-86-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go:87:// LoadConfig loads application configurations from environment variables with defaults
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go:88:func LoadConfig() *AppConfig {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-89-	cfg := &AppConfig{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-90-		Server: ServerConfig{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-91-			Port:      GetStringEnv("PORT", defaultPort),
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-92-			Host:      defaultHost,
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go-93-			GinMode:   GetStringEnv("GIN_MODE", defaultGinMode),
+pkg/config/config.go-82-	Chains        ChainsConfig
+pkg/config/config.go-83-	LogLevel      string
+pkg/config/config.go-84-	MigrationsDir string
+pkg/config/config.go-85-}
+pkg/config/config.go-86-
+pkg/config/config.go:87:// LoadConfig loads application configurations from environment variables with defaults
+pkg/config/config.go:88:func LoadConfig() *AppConfig {
+pkg/config/config.go-89-	cfg := &AppConfig{
+pkg/config/config.go-90-		Server: ServerConfig{
+pkg/config/config.go-91-			Port:      GetStringEnv("PORT", defaultPort),
+pkg/config/config.go-92-			Host:      defaultHost,
+pkg/config/config.go-93-			GinMode:   GetStringEnv("GIN_MODE", defaultGinMode),
 
 **Tool Call: grep -n -C 3 --include="**/client_manager.go" "type.*Client|type.*Manager|ClientManager|NewClient|GetClient"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-20-	ErrRPCTimeout        = errors.New("RPC request timeout")
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-21-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-22-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:23:// ClientManager manages all blockchain clients
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:24:type ClientManager struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-25-	clients    map[string]Client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-26-	mu         sync.RWMutex
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-27-	httpClient *http.Client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-28-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-29-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-30-// Client represents a blockchain RPC client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:31:type Client interface {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-32-	Name() string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-33-	Execute(ctx context.Context, method string, params any) (json.RawMessage, error)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-34-}
+pkg/blockchain/client_manager.go-20-	ErrRPCTimeout        = errors.New("RPC request timeout")
+pkg/blockchain/client_manager.go-21-)
+pkg/blockchain/client_manager.go-22-
+pkg/blockchain/client_manager.go:23:// ClientManager manages all blockchain clients
+pkg/blockchain/client_manager.go:24:type ClientManager struct {
+pkg/blockchain/client_manager.go-25-	clients    map[string]Client
+pkg/blockchain/client_manager.go-26-	mu         sync.RWMutex
+pkg/blockchain/client_manager.go-27-	httpClient *http.Client
+pkg/blockchain/client_manager.go-28-}
+pkg/blockchain/client_manager.go-29-
+pkg/blockchain/client_manager.go-30-// Client represents a blockchain RPC client
+pkg/blockchain/client_manager.go:31:type Client interface {
+pkg/blockchain/client_manager.go-32-	Name() string
+pkg/blockchain/client_manager.go-33-	Execute(ctx context.Context, method string, params any) (json.RawMessage, error)
+pkg/blockchain/client_manager.go-34-}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-56-	Data    string `json:"data,omitempty"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-57-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-58-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:59:// NewClientManager creates a new client manager with configuration
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:60:func NewClientManager(appConfig *config.AppConfig) (*ClientManager, error) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:61:	manager := &ClientManager{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-62-		clients: make(map[string]Client),
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-63-		httpClient: &http.Client{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-64-			Timeout: 30 * time.Second,
+pkg/blockchain/client_manager.go-56-	Data    string `json:"data,omitempty"`
+pkg/blockchain/client_manager.go-57-}
+pkg/blockchain/client_manager.go-58-
+pkg/blockchain/client_manager.go:59:// NewClientManager creates a new client manager with configuration
+pkg/blockchain/client_manager.go:60:func NewClientManager(appConfig *config.AppConfig) (*ClientManager, error) {
+pkg/blockchain/client_manager.go:61:	manager := &ClientManager{
+pkg/blockchain/client_manager.go-62-		clients: make(map[string]Client),
+pkg/blockchain/client_manager.go-63-		httpClient: &http.Client{
+pkg/blockchain/client_manager.go-64-			Timeout: 30 * time.Second,
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-83-	return manager, nil
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-84-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-85-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:86:// NewClientManagerLegacy creates a new client manager with legacy hardcoded clients
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-87-// This is kept for backward compatibility
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:88:func NewClientManagerLegacy() (*ClientManager, error) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:89:	manager := &ClientManager{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-90-		clients: make(map[string]Client),
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-91-		httpClient: &http.Client{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-92-			Timeout: 30 * time.Second,
+pkg/blockchain/client_manager.go-83-	return manager, nil
+pkg/blockchain/client_manager.go-84-}
+pkg/blockchain/client_manager.go-85-
+pkg/blockchain/client_manager.go:86:// NewClientManagerLegacy creates a new client manager with legacy hardcoded clients
+pkg/blockchain/client_manager.go-87-// This is kept for backward compatibility
+pkg/blockchain/client_manager.go:88:func NewClientManagerLegacy() (*ClientManager, error) {
+pkg/blockchain/client_manager.go:89:	manager := &ClientManager{
+pkg/blockchain/client_manager.go-90-		clients: make(map[string]Client),
+pkg/blockchain/client_manager.go-91-		httpClient: &http.Client{
+pkg/blockchain/client_manager.go-92-			Timeout: 30 * time.Second,
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-102-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-103-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-104-// registerClientsFromConfig registers blockchain clients based on configuration
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:105:func (cm *ClientManager) registerClientsFromConfig(chainsConfig config.ChainsConfig) error {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-106-	for _, chainConfig := range chainsConfig.EVMChains {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-107-		if !chainConfig.Enabled {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-108-			continue
+pkg/blockchain/client_manager.go-102-}
+pkg/blockchain/client_manager.go-103-
+pkg/blockchain/client_manager.go-104-// registerClientsFromConfig registers blockchain clients based on configuration
+pkg/blockchain/client_manager.go:105:func (cm *ClientManager) registerClientsFromConfig(chainsConfig config.ChainsConfig) error {
+pkg/blockchain/client_manager.go-106-	for _, chainConfig := range chainsConfig.EVMChains {
+pkg/blockchain/client_manager.go-107-		if !chainConfig.Enabled {
+pkg/blockchain/client_manager.go-108-			continue
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-119-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-120-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-121-// registerBitcoinClient registers the Bitcoin client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:122:func (cm *ClientManager) registerBitcoinClient() error {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-123-	chainInfo, err := GetChainInfo("bitcoin")
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-124-	if err != nil {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-125-		return fmt.Errorf("failed to get Bitcoin chain info: %w", err)
+pkg/blockchain/client_manager.go-119-}
+pkg/blockchain/client_manager.go-120-
+pkg/blockchain/client_manager.go-121-// registerBitcoinClient registers the Bitcoin client
+pkg/blockchain/client_manager.go:122:func (cm *ClientManager) registerBitcoinClient() error {
+pkg/blockchain/client_manager.go-123-	chainInfo, err := GetChainInfo("bitcoin")
+pkg/blockchain/client_manager.go-124-	if err != nil {
+pkg/blockchain/client_manager.go-125-		return fmt.Errorf("failed to get Bitcoin chain info: %w", err)
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-131-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-132-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-133-// registerDefaultClients registers the default supported blockchain clients
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:134:func (cm *ClientManager) registerDefaultClients() error {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-135-	chains := ListSupportedChains()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-136-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-137-	for _, chain := range chains {
+pkg/blockchain/client_manager.go-131-}
+pkg/blockchain/client_manager.go-132-
+pkg/blockchain/client_manager.go-133-// registerDefaultClients registers the default supported blockchain clients
+pkg/blockchain/client_manager.go:134:func (cm *ClientManager) registerDefaultClients() error {
+pkg/blockchain/client_manager.go-135-	chains := ListSupportedChains()
+pkg/blockchain/client_manager.go-136-
+pkg/blockchain/client_manager.go-137-	for _, chain := range chains {
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-165-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-166-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-167-// RegisterClient registers a new blockchain client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:168:func (cm *ClientManager) RegisterClient(client Client) error {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-169-	cm.mu.Lock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-170-	defer cm.mu.Unlock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-171-
+pkg/blockchain/client_manager.go-165-}
+pkg/blockchain/client_manager.go-166-
+pkg/blockchain/client_manager.go-167-// RegisterClient registers a new blockchain client
+pkg/blockchain/client_manager.go:168:func (cm *ClientManager) RegisterClient(client Client) error {
+pkg/blockchain/client_manager.go-169-	cm.mu.Lock()
+pkg/blockchain/client_manager.go-170-	defer cm.mu.Unlock()
+pkg/blockchain/client_manager.go-171-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-178-	return nil
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-179-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-180-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:181:// GetClient returns a client for the specified blockchain
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:182:func (cm *ClientManager) GetClient(chain string) (Client, error) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-183-	cm.mu.RLock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-184-	defer cm.mu.RUnlock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-185-
+pkg/blockchain/client_manager.go-178-	return nil
+pkg/blockchain/client_manager.go-179-}
+pkg/blockchain/client_manager.go-180-
+pkg/blockchain/client_manager.go:181:// GetClient returns a client for the specified blockchain
+pkg/blockchain/client_manager.go:182:func (cm *ClientManager) GetClient(chain string) (Client, error) {
+pkg/blockchain/client_manager.go-183-	cm.mu.RLock()
+pkg/blockchain/client_manager.go-184-	defer cm.mu.RUnlock()
+pkg/blockchain/client_manager.go-185-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-200-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-201-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-202-// ListChains returns a list of all supported blockchain names
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:203:func (cm *ClientManager) ListChains() []string {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-204-	cm.mu.RLock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-205-	defer cm.mu.RUnlock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-206-
+pkg/blockchain/client_manager.go-200-}
+pkg/blockchain/client_manager.go-201-
+pkg/blockchain/client_manager.go-202-// ListChains returns a list of all supported blockchain names
+pkg/blockchain/client_manager.go:203:func (cm *ClientManager) ListChains() []string {
+pkg/blockchain/client_manager.go-204-	cm.mu.RLock()
+pkg/blockchain/client_manager.go-205-	defer cm.mu.RUnlock()
+pkg/blockchain/client_manager.go-206-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-214-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-215-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-216-// Execute executes an RPC method on the specified blockchain
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:217:func (cm *ClientManager) Execute(ctx context.Context, chain, method string, params interface{}) (json.RawMessage, error) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:218:	client, err := cm.GetClient(chain)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-219-	if err != nil {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-220-		return nil, err
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-221-	}
+pkg/blockchain/client_manager.go-214-}
+pkg/blockchain/client_manager.go-215-
+pkg/blockchain/client_manager.go-216-// Execute executes an RPC method on the specified blockchain
+pkg/blockchain/client_manager.go:217:func (cm *ClientManager) Execute(ctx context.Context, chain, method string, params interface{}) (json.RawMessage, error) {
+pkg/blockchain/client_manager.go:218:	client, err := cm.GetClient(chain)
+pkg/blockchain/client_manager.go-219-	if err != nil {
+pkg/blockchain/client_manager.go-220-		return nil, err
+pkg/blockchain/client_manager.go-221-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-224-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-225-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-226-// BatchExecute executes multiple RPC requests, potentially across different blockchains
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:227:func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][]RPCRequest) (map[string][]RPCResponse, error) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-228-	results := make(map[string][]RPCResponse)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-229-	var wg sync.WaitGroup
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-230-	var mu sync.Mutex
+pkg/blockchain/client_manager.go-224-}
+pkg/blockchain/client_manager.go-225-
+pkg/blockchain/client_manager.go-226-// BatchExecute executes multiple RPC requests, potentially across different blockchains
+pkg/blockchain/client_manager.go:227:func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][]RPCRequest) (map[string][]RPCResponse, error) {
+pkg/blockchain/client_manager.go-228-	results := make(map[string][]RPCResponse)
+pkg/blockchain/client_manager.go-229-	var wg sync.WaitGroup
+pkg/blockchain/client_manager.go-230-	var mu sync.Mutex
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-235-		go func(chain string, reqs []RPCRequest) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-236-			defer wg.Done()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-237-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go:238:			client, err := cm.GetClient(chain)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-239-			if err != nil {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-240-				mu.Lock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go-241-				errors = append(errors, fmt.Errorf("chain %s: %w", chain, err))
+pkg/blockchain/client_manager.go-235-		go func(chain string, reqs []RPCRequest) {
+pkg/blockchain/client_manager.go-236-			defer wg.Done()
+pkg/blockchain/client_manager.go-237-
+pkg/blockchain/client_manager.go:238:			client, err := cm.GetClient(chain)
+pkg/blockchain/client_manager.go-239-			if err != nil {
+pkg/blockchain/client_manager.go-240-				mu.Lock()
+pkg/blockchain/client_manager.go-241-				errors = append(errors, fmt.Errorf("chain %s: %w", chain, err))
 
 **Tool Call: grep -n -C 2 | head -30 --include="**/handler.go" "func.*Handler|Routes|RouterGroup"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-27-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-28-// NewHandler creates a new API handler with all dependencies
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:29:func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-30-	return &Handler{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-31-		clientManager:     clientManager,
+pkg/api/handler.go-27-
+pkg/api/handler.go-28-// NewHandler creates a new API handler with all dependencies
+pkg/api/handler.go:29:func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
+pkg/api/handler.go-30-	return &Handler{
+pkg/api/handler.go-31-		clientManager:     clientManager,
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-47-// @Failure      500  {object}  api.SwaggerErrorResponse
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-48-// @Router       /api/v1/chains [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:49:func (h *Handler) ListChains(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-50-	chains := h.clientManager.ListChains()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-51-
+pkg/api/handler.go-47-// @Failure      500  {object}  api.SwaggerErrorResponse
+pkg/api/handler.go-48-// @Router       /api/v1/chains [get]
+pkg/api/handler.go:49:func (h *Handler) ListChains(c *gin.Context) {
+pkg/api/handler.go-50-	chains := h.clientManager.ListChains()
+pkg/api/handler.go-51-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-70-// @Failure      504    {object}  api.SwaggerErrorResponse
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-71-// @Router       /api/v1/chains/{chain}/query [post]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:72:func (h *Handler) QueryChain(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-73-	chain := c.Param("chain")
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-74-
+pkg/api/handler.go-70-// @Failure      504    {object}  api.SwaggerErrorResponse
+pkg/api/handler.go-71-// @Router       /api/v1/chains/{chain}/query [post]
+pkg/api/handler.go:72:func (h *Handler) QueryChain(c *gin.Context) {
+pkg/api/handler.go-73-	chain := c.Param("chain")
+pkg/api/handler.go-74-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-124-// @Failure      500     {object} api.SwaggerErrorResponse
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-125-// @Router       /api/v1/batch [post]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:126:func (h *Handler) BatchQuery(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-127-	// Parse the request body
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-128-	var batchRequest map[string][]blockchain.RPCRequest
+pkg/api/handler.go-124-// @Failure      500     {object} api.SwaggerErrorResponse
+pkg/api/handler.go-125-// @Router       /api/v1/batch [post]
+pkg/api/handler.go:126:func (h *Handler) BatchQuery(c *gin.Context) {
+pkg/api/handler.go-127-	// Parse the request body
+pkg/api/handler.go-128-	var batchRequest map[string][]blockchain.RPCRequest
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-187-// @Failure      500      {object} api.SwaggerErrorResponse
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-188-// @Router       /api/v1/chains/{chain}/address/{address}/balance [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:189:func (h *Handler) GetBalance(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-190-	chain := c.Param("chain")
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go-191-	address := c.Param("address")
+pkg/api/handler.go-187-// @Failure      500      {object} api.SwaggerErrorResponse
+pkg/api/handler.go-188-// @Router       /api/v1/chains/{chain}/address/{address}/balance [get]
+pkg/api/handler.go:189:func (h *Handler) GetBalance(c *gin.Context) {
+pkg/api/handler.go-190-	chain := c.Param("chain")
+pkg/api/handler.go-191-	address := c.Param("address")
 --
 
 **Tool Call: grep -n -C 3 --include="**/swagger.yaml" "paths:|info:|title:|version:"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-285-        type: string
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-286-    type: object
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-287-host: localhost:8080
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml:288:info:
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-289-  contact:
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-290-    email: support@example.com
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-291-    name: API Support
+docs/swagger.yaml-285-        type: string
+docs/swagger.yaml-286-    type: object
+docs/swagger.yaml-287-host: localhost:8080
+docs/swagger.yaml:288:info:
+docs/swagger.yaml-289-  contact:
+docs/swagger.yaml-290-    email: support@example.com
+docs/swagger.yaml-291-    name: API Support
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-298-  license:
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-299-    name: MIT
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-300-    url: https://opensource.org/licenses/MIT
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml:301:  title: Blockchain Gateway API
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml:302:  version: "1.0"
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml:303:paths:
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-304-  /api/v1/batch:
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-305-    post:
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml-306-      consumes:
+docs/swagger.yaml-298-  license:
+docs/swagger.yaml-299-    name: MIT
+docs/swagger.yaml-300-    url: https://opensource.org/licenses/MIT
+docs/swagger.yaml:301:  title: Blockchain Gateway API
+docs/swagger.yaml:302:  version: "1.0"
+docs/swagger.yaml:303:paths:
+docs/swagger.yaml-304-  /api/v1/batch:
+docs/swagger.yaml-305-    post:
+docs/swagger.yaml-306-      consumes:
 
 **Tool Call: grep -n -C 3 --include="**/chains.go" "bitcoin|ethereum|polygon|bsc|arbitrum|optimism|base"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-12-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-13-const (
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-14-	ChainTypeEVM     ChainType = "evm"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go:15:	ChainTypeBitcoin ChainType = "bitcoin"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-16-	ChainTypeOther   ChainType = "other"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-17-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-18-
+pkg/blockchain/chains.go-12-
+pkg/blockchain/chains.go-13-const (
+pkg/blockchain/chains.go-14-	ChainTypeEVM     ChainType = "evm"
+pkg/blockchain/chains.go:15:	ChainTypeBitcoin ChainType = "bitcoin"
+pkg/blockchain/chains.go-16-	ChainTypeOther   ChainType = "other"
+pkg/blockchain/chains.go-17-)
+pkg/blockchain/chains.go-18-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-30-var (
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-31-	chainRegistry = map[string]ChainInfo{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-32-		// Bitcoin is still hardcoded as it's not EVM
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go:33:		"bitcoin": {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go:34:			Name:        "bitcoin",
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-35-			DisplayName: "Bitcoin",
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-36-			NativeToken: "BTC",
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-37-			Decimals:    8,
+pkg/blockchain/chains.go-30-var (
+pkg/blockchain/chains.go-31-	chainRegistry = map[string]ChainInfo{
+pkg/blockchain/chains.go-32-		// Bitcoin is still hardcoded as it's not EVM
+pkg/blockchain/chains.go:33:		"bitcoin": {
+pkg/blockchain/chains.go:34:			Name:        "bitcoin",
+pkg/blockchain/chains.go-35-			DisplayName: "Bitcoin",
+pkg/blockchain/chains.go-36-			NativeToken: "BTC",
+pkg/blockchain/chains.go-37-			Decimals:    8,
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-57-		}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-58-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-59-		chainType := ChainTypeEVM
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go:60:		if chainConfig.Type == "bitcoin" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-61-			chainType = ChainTypeBitcoin
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-62-		} else if chainConfig.Type == "other" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go-63-			chainType = ChainTypeOther
+pkg/blockchain/chains.go-57-		}
+pkg/blockchain/chains.go-58-
+pkg/blockchain/chains.go-59-		chainType := ChainTypeEVM
+pkg/blockchain/chains.go:60:		if chainConfig.Type == "bitcoin" {
+pkg/blockchain/chains.go-61-			chainType = ChainTypeBitcoin
+pkg/blockchain/chains.go-62-		} else if chainConfig.Type == "other" {
+pkg/blockchain/chains.go-63-			chainType = ChainTypeOther
 
 **Tool Call: grep -n --include="**/handler.go" "func.*routes|api/v[0-9]"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:48:// @Router       /api/v1/chains [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:71:// @Router       /api/v1/chains/{chain}/query [post]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:125:// @Router       /api/v1/batch [post]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:188:// @Router       /api/v1/chains/{chain}/address/{address}/balance [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:224:// @Router       /api/v1/chains/{chain}/block/latest [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:260:// @Router       /api/v1/chains/{chain}/tx/{hash} [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:296:// @Router       /api/v1/chains/{chain}/gas-price [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:337:// @Router       /api/v1/chains/{chain}/address/{address}/nonce [get]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:381:// @Router       /api/v1/markets [get]
+pkg/api/handler.go:48:// @Router       /api/v1/chains [get]
+pkg/api/handler.go:71:// @Router       /api/v1/chains/{chain}/query [post]
+pkg/api/handler.go:125:// @Router       /api/v1/batch [post]
+pkg/api/handler.go:188:// @Router       /api/v1/chains/{chain}/address/{address}/balance [get]
+pkg/api/handler.go:224:// @Router       /api/v1/chains/{chain}/block/latest [get]
+pkg/api/handler.go:260:// @Router       /api/v1/chains/{chain}/tx/{hash} [get]
+pkg/api/handler.go:296:// @Router       /api/v1/chains/{chain}/gas-price [get]
+pkg/api/handler.go:337:// @Router       /api/v1/chains/{chain}/address/{address}/nonce [get]
+pkg/api/handler.go:381:// @Router       /api/v1/markets [get]
 
 **Tool Call: grep -n -C 5 --include="**/docker-compose.yml" "services:|postgres|redis|environment|ports|volumes"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-1-version: '3.8'
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-2-
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:3:services:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-4-  # Development service with hot-reloading
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-5-  blockchain-gateway-dev:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-6-    build:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-7-      context: .
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-8-      target: development
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-9-    container_name: blockchain-gateway-dev
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:10:    volumes:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-11-      - .:/app
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-12-      - go-modules:/go/pkg/mod
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:13:    ports:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-14-      - "8080:8080"
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:15:    environment:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-16-      - GIN_MODE=debug
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-17-      - PORT=8080
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-18-      - ETH_RPC_URL=https://ethereum.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-19-      - BTC_RPC_URL=https://btc.getblock.io/mainnet
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-20-      - LOG_LEVEL=debug
+docker-compose.yml-1-version: '3.8'
+docker-compose.yml-2-
+docker-compose.yml:3:services:
+docker-compose.yml-4-  # Development service with hot-reloading
+docker-compose.yml-5-  blockchain-gateway-dev:
+docker-compose.yml-6-    build:
+docker-compose.yml-7-      context: .
+docker-compose.yml-8-      target: development
+docker-compose.yml-9-    container_name: blockchain-gateway-dev
+docker-compose.yml:10:    volumes:
+docker-compose.yml-11-      - .:/app
+docker-compose.yml-12-      - go-modules:/go/pkg/mod
+docker-compose.yml:13:    ports:
+docker-compose.yml-14-      - "8080:8080"
+docker-compose.yml:15:    environment:
+docker-compose.yml-16-      - GIN_MODE=debug
+docker-compose.yml-17-      - PORT=8080
+docker-compose.yml-18-      - ETH_RPC_URL=https://ethereum.publicnode.com
+docker-compose.yml-19-      - BTC_RPC_URL=https://btc.getblock.io/mainnet
+docker-compose.yml-20-      - LOG_LEVEL=debug
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-27-  blockchain-gateway-prod:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-28-    build:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-29-      context: .
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-30-      target: production
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-31-    container_name: blockchain-gateway-prod
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:32:    ports:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-33-      - "8081:8080"
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:34:    environment:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-35-      - GIN_MODE=release
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-36-      - PORT=8080
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-37-      - ETH_RPC_URL=https://ethereum.publicnode.com
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-38-      - BTC_RPC_URL=https://btc.getblock.io/mainnet
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-39-      - LOG_LEVEL=info
+docker-compose.yml-27-  blockchain-gateway-prod:
+docker-compose.yml-28-    build:
+docker-compose.yml-29-      context: .
+docker-compose.yml-30-      target: production
+docker-compose.yml-31-    container_name: blockchain-gateway-prod
+docker-compose.yml:32:    ports:
+docker-compose.yml-33-      - "8081:8080"
+docker-compose.yml:34:    environment:
+docker-compose.yml-35-      - GIN_MODE=release
+docker-compose.yml-36-      - PORT=8080
+docker-compose.yml-37-      - ETH_RPC_URL=https://ethereum.publicnode.com
+docker-compose.yml-38-      - BTC_RPC_URL=https://btc.getblock.io/mainnet
+docker-compose.yml-39-      - LOG_LEVEL=info
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-52-
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-53-networks:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-54-  blockchain-network:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-55-    driver: bridge
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-56-
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml:57:volumes:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-58-  go-modules:
-/Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml-59-    driver: local
+docker-compose.yml-52-
+docker-compose.yml-53-networks:
+docker-compose.yml-54-  blockchain-network:
+docker-compose.yml-55-    driver: bridge
+docker-compose.yml-56-
+docker-compose.yml:57:volumes:
+docker-compose.yml-58-  go-modules:
+docker-compose.yml-59-    driver: local
 
 **Tool Call: grep -A 5 --include="**/README.md" "^# Blockchain Gateway"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md:# Blockchain Gateway
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md-
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md-A high-performance Go API gateway for interacting with multiple blockchain networks through a unified interface.
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md-
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md-## Overview
-/Users/dvictor/Projects/web3/blockchain-gateway/README.md-
+README.md:# Blockchain Gateway
+README.md-
+README.md-A high-performance Go API gateway for interacting with multiple blockchain networks through a unified interface.
+README.md-
+README.md-## Overview
+README.md-
 
 **Tool Call: grep -C 3 | head -25 --include="**/*.go" "type.*Request|type.*Response|type.*Model"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go-// ErrorResponse represents a standardized error response
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go:type ErrorResponse struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go-	Error   string                       `json:"error"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go-	Code    string                       `json:"code,omitempty"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors.go-	Details []validation.ValidationError `json:"details,omitempty"`
+pkg/api/errors.go-)
+pkg/api/errors.go-
+pkg/api/errors.go-// ErrorResponse represents a standardized error response
+pkg/api/errors.go:type ErrorResponse struct {
+pkg/api/errors.go-	Error   string                       `json:"error"`
+pkg/api/errors.go-	Code    string                       `json:"code,omitempty"`
+pkg/api/errors.go-	Details []validation.ValidationError `json:"details,omitempty"`
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-// HealthResponse represents the health check response
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go:type HealthResponse struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-	Status string `json:"status" example:"ok"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-	Time   string `json:"time" example:"2023-05-15T14:30:45Z"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-// ChainsResponse represents the list of supported chains
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go:type ChainsResponse struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-	Chains []string `json:"chains" example:"ethereum,bitcoin,polygon"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-	Count  int      `json:"count" example:"3"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-// GasPriceResponse represents the gas price response
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go:type GasPriceResponse struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/responses.go-	Chain       string `json:"chain" example:"ethereum"`
+pkg/api/responses.go-)
+pkg/api/responses.go-
+pkg/api/responses.go-// HealthResponse represents the health check response
+pkg/api/responses.go:type HealthResponse struct {
+pkg/api/responses.go-	Status string `json:"status" example:"ok"`
+pkg/api/responses.go-	Time   string `json:"time" example:"2023-05-15T14:30:45Z"`
+pkg/api/responses.go-}
+pkg/api/responses.go-
+pkg/api/responses.go-// ChainsResponse represents the list of supported chains
+pkg/api/responses.go:type ChainsResponse struct {
+pkg/api/responses.go-	Chains []string `json:"chains" example:"ethereum,bitcoin,polygon"`
+pkg/api/responses.go-	Count  int      `json:"count" example:"3"`
+pkg/api/responses.go-}
+pkg/api/responses.go-
+pkg/api/responses.go-// GasPriceResponse represents the gas price response
+pkg/api/responses.go:type GasPriceResponse struct {
+pkg/api/responses.go-	Chain       string `json:"chain" example:"ethereum"`
 
 **Tool Call: Find `**/*_test.go`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/api_config_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator_test.go
+pkg/api/errors_test.go
+pkg/api/handler_test.go
+pkg/blockchain/evm_client_test.go
+pkg/config/api_config_test.go
+pkg/validation/validator_test.go
 
 **Tool Call: grep --include="**/Makefile" "^[a-zA-Z_0-9-]+:"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:all: clean build
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:build:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:clean:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:run: build
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:test:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:dev:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:install-air:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:install-tools: install-air
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:swagger:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:mod:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:fmt:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:lint:
-/Users/dvictor/Projects/web3/blockchain-gateway/Makefile:help:
+Makefile:all: clean build
+Makefile:build:
+Makefile:clean:
+Makefile:run: build
+Makefile:test:
+Makefile:dev:
+Makefile:install-air:
+Makefile:install-tools: install-air
+Makefile:swagger:
+Makefile:mod:
+Makefile:fmt:
+Makefile:lint:
+Makefile:help:
 
 **Tool Call: grep -n -C 5 --include="**/evm_client.go" "type.*EVM|type.*Bitcoin|type.*Client"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-9-	"strings"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-10-	"sync/atomic"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-11-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-12-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-13-// EVMClient represents a generic EVM-compatible blockchain client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go:14:type EVMClient struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-15-	name       string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-16-	rpcURL     string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-17-	httpClient *http.Client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-18-	requestID  uint64
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go-19-}
+pkg/blockchain/evm_client.go-9-	"strings"
+pkg/blockchain/evm_client.go-10-	"sync/atomic"
+pkg/blockchain/evm_client.go-11-)
+pkg/blockchain/evm_client.go-12-
+pkg/blockchain/evm_client.go-13-// EVMClient represents a generic EVM-compatible blockchain client
+pkg/blockchain/evm_client.go:14:type EVMClient struct {
+pkg/blockchain/evm_client.go-15-	name       string
+pkg/blockchain/evm_client.go-16-	rpcURL     string
+pkg/blockchain/evm_client.go-17-	httpClient *http.Client
+pkg/blockchain/evm_client.go-18-	requestID  uint64
+pkg/blockchain/evm_client.go-19-}
 
 **Tool Call: grep -n -C 5 --include="**/middleware.go" "LoggingMiddleware|RateLimit|func"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-7-	"time"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-8-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-9-	"github.com/gin-gonic/gin"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-10-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-11-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go:12:func RateLimit(rateLimit int) gin.HandlerFunc {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-13-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-14-	// Implement rate limiting logic here
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-15-	// For now, we'll use a simple in-memory map to track requests per IP
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-16-	// In production, consider using a distributed rate limiter like redis
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-17-
+pkg/api/middleware.go-7-	"time"
+pkg/api/middleware.go-8-
+pkg/api/middleware.go-9-	"github.com/gin-gonic/gin"
+pkg/api/middleware.go-10-)
+pkg/api/middleware.go-11-
+pkg/api/middleware.go:12:func RateLimit(rateLimit int) gin.HandlerFunc {
+pkg/api/middleware.go-13-
+pkg/api/middleware.go-14-	// Implement rate limiting logic here
+pkg/api/middleware.go-15-	// For now, we'll use a simple in-memory map to track requests per IP
+pkg/api/middleware.go-16-	// In production, consider using a distributed rate limiter like redis
+pkg/api/middleware.go-17-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-26-	var (
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-27-		rateLimitMap = make(map[string]*rateLimitEntry)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-28-		mutex        sync.Mutex
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-29-	)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-30-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go:31:	return func(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-32-		ip := c.ClientIP()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-33-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-34-		mutex.Lock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-35-		defer mutex.Unlock()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-36-
+pkg/api/middleware.go-26-	var (
+pkg/api/middleware.go-27-		rateLimitMap = make(map[string]*rateLimitEntry)
+pkg/api/middleware.go-28-		mutex        sync.Mutex
+pkg/api/middleware.go-29-	)
+pkg/api/middleware.go-30-
+pkg/api/middleware.go:31:	return func(c *gin.Context) {
+pkg/api/middleware.go-32-		ip := c.ClientIP()
+pkg/api/middleware.go-33-
+pkg/api/middleware.go-34-		mutex.Lock()
+pkg/api/middleware.go-35-		defer mutex.Unlock()
+pkg/api/middleware.go-36-
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-67-		entry.count++
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-68-		c.Next()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-69-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-70-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-71-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go:72:func LoggingMiddleware(logger *log.Logger) gin.HandlerFunc {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go:73:	return func(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-74-		start := time.Now()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-75-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-76-		// Process request
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-77-		c.Next()
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go-78-
+pkg/api/middleware.go-67-		entry.count++
+pkg/api/middleware.go-68-		c.Next()
+pkg/api/middleware.go-69-	}
+pkg/api/middleware.go-70-}
+pkg/api/middleware.go-71-
+pkg/api/middleware.go:72:func LoggingMiddleware(logger *log.Logger) gin.HandlerFunc {
+pkg/api/middleware.go:73:	return func(c *gin.Context) {
+pkg/api/middleware.go-74-		start := time.Now()
+pkg/api/middleware.go-75-
+pkg/api/middleware.go-76-		// Process request
+pkg/api/middleware.go-77-		c.Next()
+pkg/api/middleware.go-78-
 
 **Tool Call: grep --include="**/Dockerfile" "FROM|RUN|CMD|EXPOSE|COPY"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:FROM golang:1.24.3-alpine AS builder
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN apk add --no-cache git make
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:COPY go.mod go.sum* ./
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN go mod download
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:COPY . .
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN CGO_ENABLED=0 GOOS=linux go build -o /blockchain-gateway ./cmd/server
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:FROM golang:1.24.3-alpine AS development
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN go install github.com/cosmtrek/air@latest && \
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:COPY . .
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN go mod download
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:EXPOSE 8080
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:CMD ["air", "-c", ".air.toml"]
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:FROM alpine:3.18 AS production
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN apk --no-cache add ca-certificates tzdata
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:COPY --from=builder /blockchain-gateway .
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:COPY .env* ./
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:RUN adduser -D -g '' appuser && \
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:EXPOSE 8080
-/Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile:CMD ["./blockchain-gateway"]
+Dockerfile:FROM golang:1.24.3-alpine AS builder
+Dockerfile:RUN apk add --no-cache git make
+Dockerfile:COPY go.mod go.sum* ./
+Dockerfile:RUN go mod download
+Dockerfile:COPY . .
+Dockerfile:RUN CGO_ENABLED=0 GOOS=linux go build -o /blockchain-gateway ./cmd/server
+Dockerfile:FROM golang:1.24.3-alpine AS development
+Dockerfile:RUN go install github.com/cosmtrek/air@latest && \
+Dockerfile:COPY . .
+Dockerfile:RUN go mod download
+Dockerfile:EXPOSE 8080
+Dockerfile:CMD ["air", "-c", ".air.toml"]
+Dockerfile:FROM alpine:3.18 AS production
+Dockerfile:RUN apk --no-cache add ca-certificates tzdata
+Dockerfile:COPY --from=builder /blockchain-gateway .
+Dockerfile:COPY .env* ./
+Dockerfile:RUN adduser -D -g '' appuser && \
+Dockerfile:EXPOSE 8080
+Dockerfile:CMD ["./blockchain-gateway"]
 
 **Tool Call: grep -n -C 5 --include="**/service.go" "type.*Service"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-9-	"github.com/dvictor357/blockchain-gateway/pkg/models"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-10-	"github.com/robfig/cron/v3"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-11-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-12-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-13-// ServiceConfig holds configuration for the MarketDataService
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go:14:type ServiceConfig struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-15-	CoinGeckoVsCurrency      string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-16-	CoinGeckoOrder           string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-17-	CoinGeckoPerPage         int
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-18-	CoinGeckoPage            int
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-19-	CoinGeckoSparkline       bool
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-20-	CoinGeckoPriceChangePerc []string // e.g., ["1h", "24h", "7d"]
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-21-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-22-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-23-// Service orchestrates fetching and storing of market data.
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go:24:type Service struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-25-	logger   *log.Logger
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-26-	cgClient *coingecko.Client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-27-	repo     MarketRepository
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-28-	config   ServiceConfig
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/service.go-29-	cron     *cron.Cron
+pkg/marketdata/service.go-9-	"github.com/dvictor357/blockchain-gateway/pkg/models"
+pkg/marketdata/service.go-10-	"github.com/robfig/cron/v3"
+pkg/marketdata/service.go-11-)
+pkg/marketdata/service.go-12-
+pkg/marketdata/service.go-13-// ServiceConfig holds configuration for the MarketDataService
+pkg/marketdata/service.go:14:type ServiceConfig struct {
+pkg/marketdata/service.go-15-	CoinGeckoVsCurrency      string
+pkg/marketdata/service.go-16-	CoinGeckoOrder           string
+pkg/marketdata/service.go-17-	CoinGeckoPerPage         int
+pkg/marketdata/service.go-18-	CoinGeckoPage            int
+pkg/marketdata/service.go-19-	CoinGeckoSparkline       bool
+pkg/marketdata/service.go-20-	CoinGeckoPriceChangePerc []string // e.g., ["1h", "24h", "7d"]
+pkg/marketdata/service.go-21-}
+pkg/marketdata/service.go-22-
+pkg/marketdata/service.go-23-// Service orchestrates fetching and storing of market data.
+pkg/marketdata/service.go:24:type Service struct {
+pkg/marketdata/service.go-25-	logger   *log.Logger
+pkg/marketdata/service.go-26-	cgClient *coingecko.Client
+pkg/marketdata/service.go-27-	repo     MarketRepository
+pkg/marketdata/service.go-28-	config   ServiceConfig
+pkg/marketdata/service.go-29-	cron     *cron.Cron
 
 **Tool Call: Find `**/migrations/*`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql
+migrations/001_create_coin_markets_table.sql
 
 **Tool Call: grep | head -15 --include="**/handler.go" "GetBalance|GetBlock|GetTransaction|GetGasPrice"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:// GetBalance retrieves the balance for an address with improved validation
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) GetBalance(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:	balance, err := h.clientManager.GetBalance(ctx, chain, address)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:// GetTransaction retrieves transaction details with improved validation
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) GetTransaction(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:	tx, err := h.clientManager.GetTransaction(ctx, chain, hash)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:// GetGasPrice retrieves the current gas price with improved validation
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) GetGasPrice(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:	gasPrice, err := h.clientManager.GetGasPrice(ctx, chain)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:// GetTransactionCount retrieves the transaction count with improved validation
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) GetTransactionCount(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:	count, err := h.clientManager.GetTransactionCount(ctx, chain, address)
+pkg/api/handler.go:// GetBalance retrieves the balance for an address with improved validation
+pkg/api/handler.go:func (h *Handler) GetBalance(c *gin.Context) {
+pkg/api/handler.go:	balance, err := h.clientManager.GetBalance(ctx, chain, address)
+pkg/api/handler.go:// GetTransaction retrieves transaction details with improved validation
+pkg/api/handler.go:func (h *Handler) GetTransaction(c *gin.Context) {
+pkg/api/handler.go:	tx, err := h.clientManager.GetTransaction(ctx, chain, hash)
+pkg/api/handler.go:// GetGasPrice retrieves the current gas price with improved validation
+pkg/api/handler.go:func (h *Handler) GetGasPrice(c *gin.Context) {
+pkg/api/handler.go:	gasPrice, err := h.clientManager.GetGasPrice(ctx, chain)
+pkg/api/handler.go:// GetTransactionCount retrieves the transaction count with improved validation
+pkg/api/handler.go:func (h *Handler) GetTransactionCount(c *gin.Context) {
+pkg/api/handler.go:	count, err := h.clientManager.GetTransactionCount(ctx, chain, address)
 
-**Tool Call: `tree -L 2 /Users/dvictor/Projects/web3/blockchain-gateway -I 'node_modules|.git|vendor'`**
+**Tool Call: `tree -L 2 . -I 'node_modules|.git|vendor'`**
 Status: Failed
 
 ```
@@ -1170,204 +1170,204 @@ Status: Failed
 **Tool Call: Find `**/migrations/*.sql`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql
+migrations/001_create_coin_markets_table.sql
 
 **Tool Call: grep -n -C 5 --include="**/market_types.go" "type.*Market|type.*Coin|type.*Model"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-7-	"time"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-8-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-9-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-10-// CoinMarket defines the structure for coin market data.
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-11-// This structure is used across CoinGecko client, database repository, and API responses.
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go:12:type CoinMarket struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-13-	ID                           string     `json:"id"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-14-	Symbol                       string     `json:"symbol"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-15-	Name                         string     `json:"name"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-16-	Image                        string     `json:"image"`
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/models/market_types.go-17-	CurrentPrice                 *float64   `json:"current_price,omitempty"`
+pkg/models/market_types.go-7-	"time"
+pkg/models/market_types.go-8-)
+pkg/models/market_types.go-9-
+pkg/models/market_types.go-10-// CoinMarket defines the structure for coin market data.
+pkg/models/market_types.go-11-// This structure is used across CoinGecko client, database repository, and API responses.
+pkg/models/market_types.go:12:type CoinMarket struct {
+pkg/models/market_types.go-13-	ID                           string     `json:"id"`
+pkg/models/market_types.go-14-	Symbol                       string     `json:"symbol"`
+pkg/models/market_types.go-15-	Name                         string     `json:"name"`
+pkg/models/market_types.go-16-	Image                        string     `json:"image"`
+pkg/models/market_types.go-17-	CurrentPrice                 *float64   `json:"current_price,omitempty"`
 
 **Tool Call: grep -C 3 --include="**/repository.go" "type.*Repository|type.*DB|interface"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-	_ "github.com/lib/pq"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go:// MarketRepository defines the interface for database operations on coin market data.
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go:type MarketRepository interface {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-	UpsertCoinMarkets(ctx context.Context, markets []models.CoinMarket) error
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-	GetCoinMarkets(ctx context.Context, limit int, offset int, orderBy string, sortDirection string) ([]models.CoinMarket, int, time.Time, error)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-	GetLatestDataFetchedTimestamp(ctx context.Context) (time.Time, error)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-// PostgresMarketRepository implements MarketRepository for PostgreSQL.
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go:type PostgresMarketRepository struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-	db *sql.DB
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/marketdata/repository.go-
+pkg/marketdata/repository.go-	_ "github.com/lib/pq"
+pkg/marketdata/repository.go-)
+pkg/marketdata/repository.go-
+pkg/marketdata/repository.go:// MarketRepository defines the interface for database operations on coin market data.
+pkg/marketdata/repository.go:type MarketRepository interface {
+pkg/marketdata/repository.go-	UpsertCoinMarkets(ctx context.Context, markets []models.CoinMarket) error
+pkg/marketdata/repository.go-	GetCoinMarkets(ctx context.Context, limit int, offset int, orderBy string, sortDirection string) ([]models.CoinMarket, int, time.Time, error)
+pkg/marketdata/repository.go-	GetLatestDataFetchedTimestamp(ctx context.Context) (time.Time, error)
+pkg/marketdata/repository.go-}
+pkg/marketdata/repository.go-
+pkg/marketdata/repository.go-// PostgresMarketRepository implements MarketRepository for PostgreSQL.
+pkg/marketdata/repository.go:type PostgresMarketRepository struct {
+pkg/marketdata/repository.go-	db *sql.DB
+pkg/marketdata/repository.go-}
+pkg/marketdata/repository.go-
 
 **Tool Call: Find `**/.air.toml`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/.air.toml
+.air.toml
 
 **Tool Call: grep -n -C 10 --include="**/*.sql" "CREATE TABLE"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-1--- Migrations for coin_markets table
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-2-
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql:3:CREATE TABLE IF NOT EXISTS coin_markets (
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-4-    id VARCHAR(255) PRIMARY KEY,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-5-    symbol VARCHAR(50),
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-6-    name VARCHAR(255),
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-7-    image TEXT,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-8-    current_price NUMERIC,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-9-    market_cap BIGINT,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-10-    market_cap_rank INT,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-11-    fully_diluted_valuation BIGINT,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-12-    total_volume NUMERIC,
-/Users/dvictor/Projects/web3/blockchain-gateway/migrations/001_create_coin_markets_table.sql-13-    high_24h NUMERIC,
+migrations/001_create_coin_markets_table.sql-1--- Migrations for coin_markets table
+migrations/001_create_coin_markets_table.sql-2-
+migrations/001_create_coin_markets_table.sql:3:CREATE TABLE IF NOT EXISTS coin_markets (
+migrations/001_create_coin_markets_table.sql-4-    id VARCHAR(255) PRIMARY KEY,
+migrations/001_create_coin_markets_table.sql-5-    symbol VARCHAR(50),
+migrations/001_create_coin_markets_table.sql-6-    name VARCHAR(255),
+migrations/001_create_coin_markets_table.sql-7-    image TEXT,
+migrations/001_create_coin_markets_table.sql-8-    current_price NUMERIC,
+migrations/001_create_coin_markets_table.sql-9-    market_cap BIGINT,
+migrations/001_create_coin_markets_table.sql-10-    market_cap_rank INT,
+migrations/001_create_coin_markets_table.sql-11-    fully_diluted_valuation BIGINT,
+migrations/001_create_coin_markets_table.sql-12-    total_volume NUMERIC,
+migrations/001_create_coin_markets_table.sql-13-    high_24h NUMERIC,
 
 **Tool Call: Find `**/docs/*`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/EVM_CHAINS_CONFIG.md
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.json
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml
-/Users/dvictor/Projects/web3/blockchain-gateway/docs/docs.go
+docs/EVM_CHAINS_CONFIG.md
+docs/swagger.json
+docs/swagger.yaml
+docs/docs.go
 
 **Tool Call: grep --include="**/*.go" "TODO|FIXME|XXX"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go:	// TODO: Add authentication mechanism for Bitcoin nodes
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/coingecko/client.go:		// TODO: Parse error body from CoinGecko if available for more details
+pkg/blockchain/bitcoin.go:	// TODO: Add authentication mechanism for Bitcoin nodes
+pkg/coingecko/client.go:		// TODO: Parse error body from CoinGecko if available for more details
 
 **Tool Call: grep -C 3 --include="**/validator.go" "func.*Validate|Validate.*Address|Validate.*Chain"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-// Transaction hash regex pattern
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-var transactionHashRegex = regexp.MustCompile(`^0x[a-fA-F0-9]{64}$`)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:// ValidateChainName validates a blockchain name
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateChainName(chain string) ValidationError {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if chain == "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		return ValidationError{Field: "chain", Message: "chain name is required"}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
+pkg/validation/validator.go-// Transaction hash regex pattern
+pkg/validation/validator.go-var transactionHashRegex = regexp.MustCompile(`^0x[a-fA-F0-9]{64}$`)
+pkg/validation/validator.go-
+pkg/validation/validator.go:// ValidateChainName validates a blockchain name
+pkg/validation/validator.go:func (v *Validator) ValidateChainName(chain string) ValidationError {
+pkg/validation/validator.go-	if chain == "" {
+pkg/validation/validator.go-		return ValidationError{Field: "chain", Message: "chain name is required"}
+pkg/validation/validator.go-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	return ValidationError{}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:// ValidateAddress validates a blockchain address based on the chain type
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateAddress(address, chain string) ValidationError {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if address == "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		return ValidationError{Field: "address", Message: "address is required"}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
+pkg/validation/validator.go-	return ValidationError{}
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go:// ValidateAddress validates a blockchain address based on the chain type
+pkg/validation/validator.go:func (v *Validator) ValidateAddress(address, chain string) ValidationError {
+pkg/validation/validator.go-	if address == "" {
+pkg/validation/validator.go-		return ValidationError{Field: "address", Message: "address is required"}
+pkg/validation/validator.go-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-// ValidateTransactionHash validates a transaction hash
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateTransactionHash(hash, chain string) ValidationError {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if hash == "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		return ValidationError{Field: "hash", Message: "transaction hash is required"}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go-// ValidateTransactionHash validates a transaction hash
+pkg/validation/validator.go:func (v *Validator) ValidateTransactionHash(hash, chain string) ValidationError {
+pkg/validation/validator.go-	if hash == "" {
+pkg/validation/validator.go-		return ValidationError{Field: "hash", Message: "transaction hash is required"}
+pkg/validation/validator.go-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-// ValidatePaginationParams validates pagination parameters
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidatePaginationParams(limit, offset int) ValidationErrors {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	var errors ValidationErrors
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if limit < 1 {
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go-// ValidatePaginationParams validates pagination parameters
+pkg/validation/validator.go:func (v *Validator) ValidatePaginationParams(limit, offset int) ValidationErrors {
+pkg/validation/validator.go-	var errors ValidationErrors
+pkg/validation/validator.go-
+pkg/validation/validator.go-	if limit < 1 {
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-// ValidateOrderBy validates order by field
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateOrderBy(orderBy string, allowedFields []string) ValidationError {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if orderBy == "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		return ValidationError{} // Empty is allowed, will use default
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go-// ValidateOrderBy validates order by field
+pkg/validation/validator.go:func (v *Validator) ValidateOrderBy(orderBy string, allowedFields []string) ValidationError {
+pkg/validation/validator.go-	if orderBy == "" {
+pkg/validation/validator.go-		return ValidationError{} // Empty is allowed, will use default
+pkg/validation/validator.go-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-// ValidateSortDirection validates sort direction
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateSortDirection(direction string) ValidationError {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if direction == "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		return ValidationError{} // Empty is allowed, will use default
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go-// ValidateSortDirection validates sort direction
+pkg/validation/validator.go:func (v *Validator) ValidateSortDirection(direction string) ValidationError {
+pkg/validation/validator.go-	if direction == "" {
+pkg/validation/validator.go-		return ValidationError{} // Empty is allowed, will use default
+pkg/validation/validator.go-	}
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-// ValidateRPCRequest validates a JSON-RPC request
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateRPCRequest(method string, params interface{}) ValidationErrors {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	var errors ValidationErrors
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	if method == "" {
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go-// ValidateRPCRequest validates a JSON-RPC request
+pkg/validation/validator.go:func (v *Validator) ValidateRPCRequest(method string, params interface{}) ValidationErrors {
+pkg/validation/validator.go-	var errors ValidationErrors
+pkg/validation/validator.go-
+pkg/validation/validator.go-	if method == "" {
 --
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	return errors
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:// ValidateChainAndAddress validates both chain and address together
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateChainAndAddress(chain, address string) ValidationErrors {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	var errors ValidationErrors
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:	if chainErr := v.ValidateChainName(chain); chainErr.Message != "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		errors = append(errors, chainErr)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:	if addressErr := v.ValidateAddress(address, chain); addressErr.Message != "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		errors = append(errors, addressErr)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	return errors
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:// ValidateChainAndHash validates both chain and transaction hash together
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:func (v *Validator) ValidateChainAndHash(chain, hash string) ValidationErrors {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	var errors ValidationErrors
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go:	if chainErr := v.ValidateChainName(chain); chainErr.Message != "" {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-		errors = append(errors, chainErr)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-	}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator.go-
+pkg/validation/validator.go-	return errors
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go:// ValidateChainAndAddress validates both chain and address together
+pkg/validation/validator.go:func (v *Validator) ValidateChainAndAddress(chain, address string) ValidationErrors {
+pkg/validation/validator.go-	var errors ValidationErrors
+pkg/validation/validator.go-
+pkg/validation/validator.go:	if chainErr := v.ValidateChainName(chain); chainErr.Message != "" {
+pkg/validation/validator.go-		errors = append(errors, chainErr)
+pkg/validation/validator.go-	}
+pkg/validation/validator.go-
+pkg/validation/validator.go:	if addressErr := v.ValidateAddress(address, chain); addressErr.Message != "" {
+pkg/validation/validator.go-		errors = append(errors, addressErr)
+pkg/validation/validator.go-	}
+pkg/validation/validator.go-
+pkg/validation/validator.go-	return errors
+pkg/validation/validator.go-}
+pkg/validation/validator.go-
+pkg/validation/validator.go:// ValidateChainAndHash validates both chain and transaction hash together
+pkg/validation/validator.go:func (v *Validator) ValidateChainAndHash(chain, hash string) ValidationErrors {
+pkg/validation/validator.go-	var errors ValidationErrors
+pkg/validation/validator.go-
+pkg/validation/validator.go:	if chainErr := v.ValidateChainName(chain); chainErr.Message != "" {
+pkg/validation/validator.go-		errors = append(errors, chainErr)
+pkg/validation/validator.go-	}
+pkg/validation/validator.go-
 
 **Tool Call: grep -n -C 5 --include="**/bitcoin.go" "type.*Bitcoin|Bitcoin.*struct"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-9-	"net/http"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-10-	"sync/atomic"
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-11-)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-12-
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-13-// BitcoinClient implements the Client interface for Bitcoin
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go:14:type BitcoinClient struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-15-	rpcURL     string
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-16-	httpClient *http.Client
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-17-	requestID  uint64
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-18-}
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/bitcoin.go-19-
+pkg/blockchain/bitcoin.go-9-	"net/http"
+pkg/blockchain/bitcoin.go-10-	"sync/atomic"
+pkg/blockchain/bitcoin.go-11-)
+pkg/blockchain/bitcoin.go-12-
+pkg/blockchain/bitcoin.go-13-// BitcoinClient implements the Client interface for Bitcoin
+pkg/blockchain/bitcoin.go:14:type BitcoinClient struct {
+pkg/blockchain/bitcoin.go-15-	rpcURL     string
+pkg/blockchain/bitcoin.go-16-	httpClient *http.Client
+pkg/blockchain/bitcoin.go-17-	requestID  uint64
+pkg/blockchain/bitcoin.go-18-}
+pkg/blockchain/bitcoin.go-19-
 
 **Tool Call: grep | head -20 --include="**/handler.go" "func.*routes|Routes|Handler|Setup"**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:// Handler manages API requests with improved error handling and validation
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:type Handler struct {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:	errorHandler      *ErrorHandler
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:// NewHandler creates a new API handler with all dependencies
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:	return &Handler{
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		errorHandler:      NewErrorHandler(logger),
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) ListChains(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) QueryChain(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.HandleBindingError(c, err)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.HandleValidationErrors(c, validationErrors)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.HandleBlockchainError(c, err, "execute RPC request", chain)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:func (h *Handler) BatchQuery(c *gin.Context) {
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.HandleBindingError(c, err)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "EMPTY_BATCH",
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "BATCH_TOO_LARGE",
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:			h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:				h.errorHandler.HandleValidationErrors(c, validationErrors)
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go:		h.errorHandler.HandleGenericError(c, err, "execute batch request")
+pkg/api/handler.go:// Handler manages API requests with improved error handling and validation
+pkg/api/handler.go:type Handler struct {
+pkg/api/handler.go:	errorHandler      *ErrorHandler
+pkg/api/handler.go:// NewHandler creates a new API handler with all dependencies
+pkg/api/handler.go:func NewHandler(clientManager *blockchain.ClientManager, logger *log.Logger, marketService *marketdata.Service) *Handler {
+pkg/api/handler.go:	return &Handler{
+pkg/api/handler.go:		errorHandler:      NewErrorHandler(logger),
+pkg/api/handler.go:func (h *Handler) ListChains(c *gin.Context) {
+pkg/api/handler.go:func (h *Handler) QueryChain(c *gin.Context) {
+pkg/api/handler.go:		h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+pkg/api/handler.go:		h.errorHandler.HandleBindingError(c, err)
+pkg/api/handler.go:		h.errorHandler.HandleValidationErrors(c, validationErrors)
+pkg/api/handler.go:		h.errorHandler.HandleBlockchainError(c, err, "execute RPC request", chain)
+pkg/api/handler.go:func (h *Handler) BatchQuery(c *gin.Context) {
+pkg/api/handler.go:		h.errorHandler.HandleBindingError(c, err)
+pkg/api/handler.go:		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "EMPTY_BATCH",
+pkg/api/handler.go:		h.errorHandler.RespondWithError(c, http.StatusBadRequest, "BATCH_TOO_LARGE",
+pkg/api/handler.go:			h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+pkg/api/handler.go:				h.errorHandler.HandleValidationErrors(c, validationErrors)
+pkg/api/handler.go:		h.errorHandler.HandleGenericError(c, err, "execute batch request")
 
 ## Assistant
 
@@ -1375,7 +1375,7 @@ Status: Completed
 Great! I've got a comprehensive overview of the project. Now let me move to the next step and analyze the blockchain configuration and client management system more deeply.Now let me examine the blockchain configuration and client management system more closely by reading the relevant files.
 </thinking>
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/client_manager.go**
+**Tool Call: Read pkg/blockchain/client_manager.go**
 Status: Completed
 
 ```
@@ -1664,7 +1664,7 @@ func (cm *ClientManager) BatchExecute(ctx context.Context, requests map[string][
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/chains.go**
+**Tool Call: Read pkg/blockchain/chains.go**
 Status: Completed
 
 ```
@@ -1833,7 +1833,7 @@ func IsEVMCompatible(chain string) bool {
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client.go**
+**Tool Call: Read pkg/blockchain/evm_client.go**
 Status: Completed
 
 ```
@@ -2023,7 +2023,7 @@ func parseHexToUint64(hexStr string) (uint64, error) {
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/common.go**
+**Tool Call: Read pkg/blockchain/common.go**
 Status: Completed
 
 ```
@@ -2521,7 +2521,7 @@ func getUint64(data map[string]interface{}, key string) uint64 {
 Good, I've analyzed the blockchain configuration and client management. Now let me move on to reviewing API endpoints and documentation. Let me read the handler file and documentation.Let me read the API handler and documentation files.
 </thinking>
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler.go**
+**Tool Call: Read pkg/api/handler.go**
 Status: Completed
 
 ```
@@ -2971,7 +2971,7 @@ func (h *Handler) GetCoinMarkets(c *gin.Context) {
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/docs/swagger.yaml**
+**Tool Call: Read docs/swagger.yaml**
 Status: Completed
 
 ```
@@ -3671,11 +3671,11 @@ Good, now let me continue with assessing testing strategy and coverage.Let me ch
 **Tool Call: Find `**/*_test.go`**
 Status: Completed
 
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/errors_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/api_config_test.go
-/Users/dvictor/Projects/web3/blockchain-gateway/pkg/validation/validator_test.go
+pkg/api/errors_test.go
+pkg/api/handler_test.go
+pkg/blockchain/evm_client_test.go
+pkg/config/api_config_test.go
+pkg/validation/validator_test.go
 
 ## Assistant
 
@@ -3683,7 +3683,7 @@ Status: Completed
 Let me read the test files to understand the testing strategy and coverage.
 </thinking>
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/handler_test.go**
+**Tool Call: Read pkg/api/handler_test.go**
 Status: Completed
 
 ```
@@ -4744,7 +4744,7 @@ func TestHandler_Integration(t *testing.T) {
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/blockchain/evm_client_test.go**
+**Tool Call: Read pkg/blockchain/evm_client_test.go**
 Status: Completed
 
 ```
@@ -5253,7 +5253,7 @@ func TestEVMClient_NetworkError(t *testing.T) {
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/Makefile**
+**Tool Call: Read Makefile**
 Status: Completed
 
 ```
@@ -6164,7 +6164,7 @@ No response from model
 It looks like the WebFetch tool didn't return any content. Let me continue with the research and compilation based on the search results I already have, and move forward with identifying security improvements and performance optimizations. Let me update the todo list and proceed.Now let me analyze the config files and environment to understand security and performance aspects better.
 </thinking>
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/.env.development**
+**Tool Call: Read .env.development**
 Status: Completed
 
 ```
@@ -6258,7 +6258,7 @@ COINGECKO_ORDER=market_cap_desc
 COINGECKO_VS_CURRENCY=usd
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/config/config.go**
+**Tool Call: Read pkg/config/config.go**
 Status: Completed
 
 ```
@@ -6520,7 +6520,7 @@ func GetBoolEnv(key string, defaultValue bool) bool {
 }
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/pkg/api/middleware.go**
+**Tool Call: Read pkg/api/middleware.go**
 Status: Completed
 
 ```
@@ -6624,7 +6624,7 @@ func LoggingMiddleware(logger *log.Logger) gin.HandlerFunc {
 Good! Now I have a comprehensive view of the project. Let me continue evaluating performance optimizations and then compile all the improvement recommendations.Now let me check the docker configuration and other performance-related files.
 </thinking>
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/docker-compose.yml**
+**Tool Call: Read docker-compose.yml**
 Status: Completed
 
 ```
@@ -6689,7 +6689,7 @@ volumes:
     driver: local
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/Dockerfile**
+**Tool Call: Read Dockerfile**
 Status: Completed
 
 ```
@@ -6769,7 +6769,7 @@ ENV GIN_MODE=release
 CMD ["./blockchain-gateway"]
 ```
 
-**Tool Call: Read /Users/dvictor/Projects/web3/blockchain-gateway/.air.toml**
+**Tool Call: Read .air.toml**
 Status: Completed
 
 ```
