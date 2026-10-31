@@ -64,6 +64,8 @@ func NewHandler(clientManager BlockchainService, logger *log.Logger, marketServi
 // @Summary      List Supported Blockchains
 // @Description  Get a list of all blockchain networks supported by this gateway
 // @Tags         chains
+// @Security     APIKeyAuth
+// @Failure      401  {object} api.SwaggerErrorResponse
 // @Accept       json
 // @Produce      json
 // @Success      200  {object}  api.ChainsResponse
@@ -81,13 +83,17 @@ func (h *Handler) ListChains(c *blaze.Context) error {
 // QueryChain handles RPC queries to a specific blockchain with improved validation
 // @Summary      Execute RPC Query
 // @Description  Execute a JSON-RPC query on a specific blockchain network
+// @Description  Only exact methods in RPC_METHOD_ALLOWLIST are exposed; defaults are finite read-only methods. Denied methods return 403 RPC_METHOD_NOT_ALLOWED.
 // @Tags         chains
+// @Security     APIKeyAuth
 // @Accept       json
 // @Produce      json
-// @Param        chain  path      string                    true  "Blockchain name" Enums(ethereum, bitcoin, polygon)
+// @Param        chain  path      string                    true  "Blockchain name" Enums(ethereum, bitcoin, polygon, bsc, arbitrum, optimism, base, avalanche, fantom)
 // @Param        request body     api.SwaggerRPCRequest     true  "RPC Request"
 // @Success      200    {object}  api.SwaggerRPCResponse
 // @Failure      400    {object}  api.SwaggerErrorResponse
+// @Failure      401    {object} api.SwaggerErrorResponse
+// @Failure      403    {object} api.SwaggerErrorResponse
 // @Failure      404    {object}  api.SwaggerErrorResponse
 // @Failure      413    {object}  api.SwaggerErrorResponse
 // @Failure      500    {object}  api.SwaggerErrorResponse
@@ -111,6 +117,9 @@ func (h *Handler) QueryChain(c *blaze.Context) error {
 	// Validate RPC request
 	if validationErrors := h.validator.ValidateRPCRequest(request.Method, request.Params); validationErrors.HasErrors() {
 		return h.errorHandler.HandleValidationErrors(c, validationErrors)
+	}
+	if !h.apiConfig.IsRPCMethodAllowed(request.Method) {
+		return h.rpcMethodDenied(c, request.Method)
 	}
 
 	// Create a context with timeout
@@ -138,12 +147,16 @@ func (h *Handler) QueryChain(c *blaze.Context) error {
 // @Description  Execute multiple RPC queries across different blockchain networks in a single request.
 // @Description  The total number of RPC requests across all chains is limited (10 by default); requests on one chain run sequentially.
 // @Description  Per-request node errors are returned inside the response with their original code and data.
+// @Description  All methods are checked against RPC_METHOD_ALLOWLIST before any upstream call; one denied method rejects the entire batch with 403 RPC_METHOD_NOT_ALLOWED.
 // @Tags         chains
+// @Security     APIKeyAuth
 // @Accept       json
 // @Produce      json
 // @Param        request body     map[string][]api.SwaggerRPCRequest     true  "Batch RPC Request"
 // @Success      200     {object} map[string][]api.SwaggerRPCResponse
 // @Failure      400     {object} api.SwaggerErrorResponse
+// @Failure      401     {object} api.SwaggerErrorResponse
+// @Failure      403     {object} api.SwaggerErrorResponse
 // @Failure      404     {object} api.SwaggerErrorResponse
 // @Failure      413     {object} api.SwaggerErrorResponse
 // @Failure      500     {object} api.SwaggerErrorResponse
@@ -188,6 +201,9 @@ func (h *Handler) BatchQuery(c *blaze.Context) error {
 			if validationErrors := h.validator.ValidateRPCRequest(req.Method, req.Params); validationErrors.HasErrors() {
 				return h.errorHandler.HandleValidationErrors(c, validationErrors)
 			}
+			if !h.apiConfig.IsRPCMethodAllowed(req.Method) {
+				return h.rpcMethodDenied(c, req.Method)
+			}
 		}
 	}
 
@@ -209,12 +225,16 @@ func (h *Handler) BatchQuery(c *blaze.Context) error {
 // @Description  Get the native token balance for a specific address on a blockchain.
 // @Description  Bitcoin is not supported (HTTP 501, code OPERATION_NOT_SUPPORTED): no address index is configured.
 // @Tags         chains
+// @Security     APIKeyAuth
+// @Description  Helper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.
 // @Accept       json
 // @Produce      json
-// @Param        chain    path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon)
+// @Param        chain    path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon, bsc, arbitrum, optimism, base, avalanche, fantom)
 // @Param        address  path     string  true  "Wallet address"
 // @Success      200      {object} api.SwaggerBalance
 // @Failure      400      {object} api.SwaggerErrorResponse
+// @Failure      401      {object} api.SwaggerErrorResponse
+// @Failure      403      {object} api.SwaggerErrorResponse
 // @Failure      404      {object} api.SwaggerErrorResponse
 // @Failure      500      {object} api.SwaggerErrorResponse
 // @Failure      501      {object} api.SwaggerErrorResponse
@@ -228,6 +248,9 @@ func (h *Handler) GetBalance(c *blaze.Context) error {
 	// Validate chain and address together
 	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
 		return h.errorHandler.HandleValidationErrors(c, validationErrors)
+	}
+	if denied := h.deniedHelperMethod(chain, "balance"); denied != "" {
+		return h.rpcMethodDenied(c, denied)
 	}
 
 	// Create a context with timeout
@@ -247,11 +270,15 @@ func (h *Handler) GetBalance(c *blaze.Context) error {
 // @Summary      Get Latest Block
 // @Description  Get information about the latest block on a blockchain
 // @Tags         chains
+// @Security     APIKeyAuth
+// @Description  Helper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.
 // @Accept       json
 // @Produce      json
-// @Param        chain  path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon)
+// @Param        chain  path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon, bsc, arbitrum, optimism, base, avalanche, fantom)
 // @Success      200    {object} api.SwaggerBlockInfo
 // @Failure      400    {object} api.SwaggerErrorResponse
+// @Failure      401    {object} api.SwaggerErrorResponse
+// @Failure      403    {object} api.SwaggerErrorResponse
 // @Failure      404    {object} api.SwaggerErrorResponse
 // @Failure      500    {object} api.SwaggerErrorResponse
 // @Failure      502    {object} api.SwaggerErrorResponse
@@ -263,6 +290,9 @@ func (h *Handler) GetLatestBlock(c *blaze.Context) error {
 	// Validate chain name
 	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
 		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+	}
+	if denied := h.deniedHelperMethod(chain, "block"); denied != "" {
+		return h.rpcMethodDenied(c, denied)
 	}
 
 	// Create a context with timeout
@@ -282,12 +312,16 @@ func (h *Handler) GetLatestBlock(c *blaze.Context) error {
 // @Summary      Get Transaction Details
 // @Description  Get detailed information about a specific transaction by its hash
 // @Tags         chains
+// @Security     APIKeyAuth
+// @Description  All helper RPC dependencies, including optional receipt/block enrichment, must be permitted by RPC_METHOD_ALLOWLIST.
 // @Accept       json
 // @Produce      json
-// @Param        chain  path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon)
+// @Param        chain  path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon, bsc, arbitrum, optimism, base, avalanche, fantom)
 // @Param        hash   path     string  true  "Transaction hash"
 // @Success      200    {object} api.SwaggerTransactionInfo
 // @Failure      400    {object} api.SwaggerErrorResponse
+// @Failure      401    {object} api.SwaggerErrorResponse
+// @Failure      403    {object} api.SwaggerErrorResponse
 // @Failure      404    {object} api.SwaggerErrorResponse
 // @Failure      500    {object} api.SwaggerErrorResponse
 // @Failure      502    {object} api.SwaggerErrorResponse
@@ -300,6 +334,9 @@ func (h *Handler) GetTransaction(c *blaze.Context) error {
 	// Validate chain and hash together
 	if validationErrors := h.validator.ValidateChainAndHash(chain, hash); validationErrors.HasErrors() {
 		return h.errorHandler.HandleValidationErrors(c, validationErrors)
+	}
+	if denied := h.deniedHelperMethod(chain, "transaction"); denied != "" {
+		return h.rpcMethodDenied(c, denied)
 	}
 
 	// Create a context with timeout
@@ -319,11 +356,15 @@ func (h *Handler) GetTransaction(c *blaze.Context) error {
 // @Summary      Get Gas Price
 // @Description  Get the current gas price for EVM-compatible blockchains
 // @Tags         chains
+// @Security     APIKeyAuth
+// @Description  Helper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.
 // @Accept       json
 // @Produce      json
-// @Param        chain  path     string  true  "Blockchain name" Enums(ethereum, polygon)
+// @Param        chain  path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon, bsc, arbitrum, optimism, base, avalanche, fantom)
 // @Success      200    {object} api.GasPriceResponse
 // @Failure      400    {object} api.SwaggerErrorResponse
+// @Failure      401    {object} api.SwaggerErrorResponse
+// @Failure      403    {object} api.SwaggerErrorResponse
 // @Failure      404    {object} api.SwaggerErrorResponse
 // @Failure      500    {object} api.SwaggerErrorResponse
 // @Failure      502    {object} api.SwaggerErrorResponse
@@ -335,6 +376,9 @@ func (h *Handler) GetGasPrice(c *blaze.Context) error {
 	// Validate chain name
 	if validationErr := h.validator.ValidateChainName(chain); validationErr.Message != "" {
 		return h.errorHandler.HandleValidationErrors(c, validation.ValidationErrors{validationErr})
+	}
+	if denied := h.deniedHelperMethod(chain, "gas"); denied != "" {
+		return h.rpcMethodDenied(c, denied)
 	}
 
 	// Create a context with timeout
@@ -359,12 +403,16 @@ func (h *Handler) GetGasPrice(c *blaze.Context) error {
 // @Summary      Get Transaction Count
 // @Description  Get the number of transactions for a specific address on a blockchain
 // @Tags         chains
+// @Security     APIKeyAuth
+// @Description  Helper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.
 // @Accept       json
 // @Produce      json
-// @Param        chain    path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon)
+// @Param        chain    path     string  true  "Blockchain name" Enums(ethereum, bitcoin, polygon, bsc, arbitrum, optimism, base, avalanche, fantom)
 // @Param        address  path     string  true  "Wallet address"
 // @Success      200      {object} api.TransactionCountResponse
 // @Failure      400      {object} api.SwaggerErrorResponse
+// @Failure      401      {object} api.SwaggerErrorResponse
+// @Failure      403      {object} api.SwaggerErrorResponse
 // @Failure      404      {object} api.SwaggerErrorResponse
 // @Failure      500      {object} api.SwaggerErrorResponse
 // @Failure      502      {object} api.SwaggerErrorResponse
@@ -377,6 +425,9 @@ func (h *Handler) GetTransactionCount(c *blaze.Context) error {
 	// Validate chain and address together
 	if validationErrors := h.validator.ValidateChainAndAddress(chain, address); validationErrors.HasErrors() {
 		return h.errorHandler.HandleValidationErrors(c, validationErrors)
+	}
+	if denied := h.deniedHelperMethod(chain, "nonce"); denied != "" {
+		return h.rpcMethodDenied(c, denied)
 	}
 
 	// Create a context with timeout
@@ -398,22 +449,68 @@ func (h *Handler) GetTransactionCount(c *blaze.Context) error {
 	})
 }
 
+func (h *Handler) rpcMethodDenied(c *blaze.Context, method string) error {
+	return h.errorHandler.RespondWithError(c, http.StatusForbidden, "RPC_METHOD_NOT_ALLOWED",
+		"RPC method %q is not allowed", method)
+}
+
+// Preflight the complete helper, including optional enrichment lookups, before
+// any upstream call so a restrictive policy cannot be bypassed via REST.
+func (h *Handler) deniedHelperMethod(chain, operation string) string {
+	var methods []string
+	if strings.EqualFold(chain, "bitcoin") {
+		switch operation {
+		case "block":
+			methods = []string{"getblockcount", "getblockhash", "getblock"}
+		case "transaction":
+			methods = []string{"getrawtransaction", "getblock"}
+		}
+	} else {
+		switch operation {
+		case "balance":
+			methods = []string{"eth_getBalance"}
+		case "block":
+			methods = []string{"eth_blockNumber", "eth_getBlockByNumber"}
+		case "transaction":
+			methods = []string{"eth_getTransactionByHash", "eth_getTransactionReceipt"}
+		case "gas":
+			methods = []string{"eth_gasPrice"}
+		case "nonce":
+			methods = []string{"eth_getTransactionCount"}
+		}
+	}
+	for _, method := range methods {
+		if !h.apiConfig.IsRPCMethodAllowed(method) {
+			return method
+		}
+	}
+	return ""
+}
+
 // GetCoinMarkets handles requests for coin market data with improved validation
 // @Summary      Get Coin Markets
 // @Description  Get a list of cryptocurrency markets with pagination and sorting
 // @Tags         markets
 // @Accept       json
 // @Produce      json
+// @Security     APIKeyAuth
 // @Param        limit      query     string  true  "Number of items per page"
 // @Param        offset     query     string  true  "Page number"
 // @Param        orderBy    query     string  true  "Field to order by (case-insensitive)" Enums(market_cap_rank, name, current_price, last_updated, data_fetched_at)
 // @Param        sortDirection query     string  true  "Sort direction" Enums(asc, desc)
 // @Success      200          {object} api.MarketDataResponse
 // @Failure      400          {object} api.SwaggerErrorResponse
+// @Failure      401          {object} api.SwaggerErrorResponse
 // @Failure      500          {object} api.SwaggerErrorResponse
+// @Failure      503          {object} api.SwaggerErrorResponse
 // @Failure      504          {object} api.SwaggerErrorResponse
 // @Router       /api/v1/markets [get]
 func (h *Handler) GetCoinMarkets(c *blaze.Context) error {
+	if h.marketDataService == nil {
+		return h.errorHandler.RespondWithError(c, http.StatusServiceUnavailable, "MARKET_DATA_DISABLED",
+			"Market data is disabled; enable DATABASE_ENABLED to serve stored market data")
+	}
+
 	// Parse and validate pagination parameters
 	query := c.Request.URL.Query()
 	limitStr := queryDefault(query, "limit", strconv.Itoa(h.apiConfig.DefaultPageLimit))

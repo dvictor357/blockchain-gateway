@@ -6,8 +6,10 @@ import (
 
 // APIConfig holds API-specific configuration
 type APIConfig struct {
-	DefaultTimeout time.Duration
-	BatchTimeout   time.Duration
+	// RPCMethodAllowlist replaces the finite read-only defaults when nonempty.
+	RPCMethodAllowlist []string
+	DefaultTimeout     time.Duration
+	BatchTimeout       time.Duration
 	// MaxBatchSize is the maximum number of RPC requests in one batch, summed across all chains.
 	MaxBatchSize int
 	// MaxRequestBodyBytes is the maximum size of a JSON request body.
@@ -40,6 +42,7 @@ func NewAPIConfig() *APIConfig {
 // ordinary requests get the timeout itself and batches get twice that.
 func NewAPIConfigFromServer(server ServerConfig) *APIConfig {
 	cfg := NewAPIConfig()
+	cfg.RPCMethodAllowlist = append([]string(nil), server.RPCMethodAllowlist...)
 	if server.RequestTimeout > 0 {
 		cfg.DefaultTimeout = server.RequestTimeout
 		cfg.BatchTimeout = 2 * server.RequestTimeout
@@ -77,6 +80,20 @@ func (c *APIConfig) ValidatePageLimit(limit int) int {
 func (c *APIConfig) IsValidOrderByField(field string) bool {
 	for _, allowed := range c.AllowedOrderByFields {
 		if field == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// IsRPCMethodAllowed applies the HTTP API's exact, case-sensitive method policy.
+func (c *APIConfig) IsRPCMethodAllowed(method string) bool {
+	if len(c.RPCMethodAllowlist) == 0 {
+		_, allowed := defaultRPCMethods[method]
+		return allowed
+	}
+	for _, allowed := range c.RPCMethodAllowlist {
+		if method == allowed {
 			return true
 		}
 	}

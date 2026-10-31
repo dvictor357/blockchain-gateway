@@ -1,6 +1,8 @@
 package api
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
 	"log"
 	"net"
 	"net/http"
@@ -9,6 +11,30 @@ import (
 
 	"github.com/dvictor357/blaze"
 )
+
+// APIKeyAuth protects every HTTP path except the exact liveness endpoint.
+// Keys are accepted only in one X-API-Key header, never in the URL.
+func APIKeyAuth(apiKey string) blaze.MiddlewareFunc {
+	expected := sha256.Sum256([]byte(apiKey))
+	return func(next blaze.HandlerFunc) blaze.HandlerFunc {
+		return func(c *blaze.Context) error {
+			if apiKey == "" || c.Request.URL.Path == "/health" {
+				return next(c)
+			}
+			values := c.Request.Header.Values("X-API-Key")
+			if len(values) == 1 {
+				actual := sha256.Sum256([]byte(values[0]))
+				if subtle.ConstantTimeCompare(actual[:], expected[:]) == 1 {
+					return next(c)
+				}
+			}
+			return c.JSON(http.StatusUnauthorized, ErrorResponse{
+				Error: "A valid X-API-Key header is required",
+				Code:  "UNAUTHORIZED",
+			})
+		}
+	}
+}
 
 func RateLimit(rateLimit int) blaze.MiddlewareFunc {
 	const perMinute = time.Minute

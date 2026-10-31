@@ -3,7 +3,7 @@ module github.com/dvictor357/blockchain-gateway
 go 1.25.5
 
 require (
-	github.com/dvictor357/blaze v0.0.0-20251217150610-e6059b31909a
+	github.com/dvictor357/blaze v0.0.0-20261031064110-e0a0000a93d8
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/robfig/cron/v3 v3.0.1

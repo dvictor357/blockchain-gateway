@@ -210,7 +210,7 @@ func TestHandler_QueryChain(t *testing.T) {
 				mockClientManager.On("Execute", mock.Anything, tt.chain, "eth_blockNumber", []interface{}{}).Return(tt.mockResult, tt.mockError).Once()
 			}
 
-			w := serveHandler(http.MethodPost, "/chains/:chain/query",
+			w := serveHandler(http.MethodPost, "/chains/{chain}/query",
 				"/chains/"+tt.chain+"/query", tt.requestBody, handler.QueryChain)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
@@ -336,7 +336,7 @@ func TestHandler_GetBalance(t *testing.T) {
 				mockClientManager.On("GetBalance", mock.Anything, tt.chain, tt.address).Return(tt.mockBalance, tt.mockError).Once()
 			}
 
-			w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+			w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/balance",
 				"/chains/"+tt.chain+"/address/"+tt.address+"/balance", "", handler.GetBalance)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
@@ -374,11 +374,6 @@ func TestHandler_GetLatestBlock(t *testing.T) {
 			expectedBody:   `{"number":18934257,"hash":"0x8d12a0d346a05cf0dd9e650a5e41baa531a2ef7a287572739ce5c5a36856ec7c","parent_hash":"0x781d36b32c7cbf06d952baa1d827eb425bacfdf9c9afc30b735959054a3f2fc1","timestamp":1716403465,"transaction_count":124,"chain":"ethereum"}`,
 		},
 		{
-			name:           "invalid chain",
-			chain:          "",
-			expectedStatus: http.StatusBadRequest,
-		},
-		{
 			name:           "blockchain error",
 			chain:          "ethereum",
 			mockError:      fmt.Errorf("%w: block", blockchain.ErrNotFound),
@@ -392,7 +387,7 @@ func TestHandler_GetLatestBlock(t *testing.T) {
 				mockClientManager.On("GetLatestBlock", mock.Anything, tt.chain).Return(tt.mockBlock, tt.mockError).Once()
 			}
 
-			w := serveHandler(http.MethodGet, "/chains/:chain/block/latest",
+			w := serveHandler(http.MethodGet, "/chains/{chain}/block/latest",
 				"/chains/"+tt.chain+"/block/latest", "", handler.GetLatestBlock)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
@@ -454,7 +449,7 @@ func TestHandler_GetTransaction(t *testing.T) {
 				mockClientManager.On("GetTransaction", mock.Anything, tt.chain, tt.hash).Return(tt.mockTx, tt.mockError).Once()
 			}
 
-			w := serveHandler(http.MethodGet, "/chains/:chain/tx/:hash",
+			w := serveHandler(http.MethodGet, "/chains/{chain}/tx/{hash}",
 				"/chains/"+tt.chain+"/tx/"+tt.hash, "", handler.GetTransaction)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
@@ -485,11 +480,6 @@ func TestHandler_GetGasPrice(t *testing.T) {
 			expectedBody:   `{"chain":"ethereum","gas_price":"20000000000","gas_price_hex":"0x4a817c800"}`,
 		},
 		{
-			name:           "invalid chain",
-			chain:          "",
-			expectedStatus: http.StatusBadRequest,
-		},
-		{
 			name:           "operation not applicable",
 			chain:          "bitcoin",
 			mockError:      fmt.Errorf("%w: gas price", blockchain.ErrNotApplicable),
@@ -503,7 +493,7 @@ func TestHandler_GetGasPrice(t *testing.T) {
 				mockClientManager.On("GetGasPrice", mock.Anything, tt.chain).Return(tt.mockGasPrice, tt.mockError).Once()
 			}
 
-			w := serveHandler(http.MethodGet, "/chains/:chain/gas-price",
+			w := serveHandler(http.MethodGet, "/chains/{chain}/gas-price",
 				"/chains/"+tt.chain+"/gas-price", "", handler.GetGasPrice)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
@@ -556,7 +546,7 @@ func TestHandler_GetTransactionCount(t *testing.T) {
 				mockClientManager.On("GetTransactionCount", mock.Anything, tt.chain, tt.address).Return(tt.mockCount, tt.mockError).Once()
 			}
 
-			w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/nonce",
+			w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/nonce",
 				"/chains/"+tt.chain+"/address/"+tt.address+"/nonce", "", handler.GetTransactionCount)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
@@ -656,7 +646,7 @@ func TestHandler_Integration(t *testing.T) {
 
 	// Test that validation, error handling, and client manager integration works
 	t.Run("validation and error handling integration", func(t *testing.T) {
-		w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+		w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/balance",
 			"/chains/invalid@chain/address/invalid_address/balance", "", handler.GetBalance)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -672,7 +662,7 @@ func TestHandler_Integration(t *testing.T) {
 	t.Run("request deadline error response", func(t *testing.T) {
 		mockClientManager.On("GetBalance", mock.Anything, "ethereum", "0x742d35Cc6634C0532925a3b844Bc454e4438f44e").Return(nil, context.DeadlineExceeded).Once()
 
-		w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+		w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/balance",
 			"/chains/ethereum/address/0x742d35Cc6634C0532925a3b844Bc454e4438f44e/balance", "", handler.GetBalance)
 
 		assert.Equal(t, http.StatusGatewayTimeout, w.Code)
@@ -708,7 +698,7 @@ func TestHandler_RPCNumericFidelity(t *testing.T) {
 			} else {
 				manager.On("Execute", mock.Anything, "ethereum", "eth_call", params).
 					Return(json.RawMessage(numericParams), nil).Once()
-				w = serveHandler(http.MethodPost, "/chains/:chain/query", "/chains/ethereum/query",
+				w = serveHandler(http.MethodPost, "/chains/{chain}/query", "/chains/ethereum/query",
 					requestBody, handler.QueryChain)
 			}
 

@@ -94,7 +94,7 @@ func TestUpstream_BitcoinAddressBalanceIsUnsupportedAndNeverQueriesTheWallet(t *
 	btc, btcHits := startNode(t, true, func(string) fakeReply { return fakeReply{result: `12.5`} })
 	handler := newUpstreamHandler(t, "http://127.0.0.1:1", btc.URL)
 
-	w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+	w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/balance",
 		"/chains/bitcoin/address/1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa/balance", "", handler.GetBalance)
 
 	assert.Equal(t, http.StatusNotImplemented, w.Code)
@@ -123,7 +123,7 @@ func TestUpstream_FailuresAreClassifiedWithoutLeakingNodeDetails(t *testing.T) {
 			evm, _ := startNode(t, false, func(string) fakeReply { return tt.reply })
 			handler := newUpstreamHandler(t, evm.URL+"/v2/leaky-key", "")
 
-			w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+			w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/balance",
 				"/chains/"+testEVMChain+"/address/"+testAddress+"/balance", "", handler.GetBalance)
 
 			assert.Equal(t, tt.wantStatus, w.Code)
@@ -137,7 +137,7 @@ func TestUpstream_ValidBalanceIsParsedExactly(t *testing.T) {
 	evm, _ := startNode(t, false, func(string) fakeReply { return fakeReply{result: `"0xde0b6b3a7640000"`} })
 	handler := newUpstreamHandler(t, evm.URL, "")
 
-	w := serveHandler(http.MethodGet, "/chains/:chain/address/:address/balance",
+	w := serveHandler(http.MethodGet, "/chains/{chain}/address/{address}/balance",
 		"/chains/"+testEVMChain+"/address/"+testAddress+"/balance", "", handler.GetBalance)
 
 	require.Equal(t, http.StatusOK, w.Code)
@@ -153,7 +153,7 @@ func TestUpstream_RequestContextDecidesBetweenTimeoutAndCancellation(t *testing.
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
 		defer cancel()
 
-		w := serveWithContext(ctx, http.MethodGet, "/chains/:chain/address/:address/nonce", target, "", handler.GetTransactionCount)
+		w := serveWithContext(ctx, http.MethodGet, "/chains/{chain}/address/{address}/nonce", target, "", handler.GetTransactionCount)
 
 		assert.Equal(t, http.StatusGatewayTimeout, w.Code)
 		assert.Equal(t, "RPC_TIMEOUT", errorCode(t, w))
@@ -163,7 +163,7 @@ func TestUpstream_RequestContextDecidesBetweenTimeoutAndCancellation(t *testing.
 		ctx, cancel := context.WithCancel(context.Background())
 		cancel()
 
-		w := serveWithContext(ctx, http.MethodGet, "/chains/:chain/address/:address/nonce", target, "", handler.GetTransactionCount)
+		w := serveWithContext(ctx, http.MethodGet, "/chains/{chain}/address/{address}/nonce", target, "", handler.GetTransactionCount)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Equal(t, "INTERNAL_ERROR", errorCode(t, w))
@@ -215,6 +215,7 @@ func TestUpstream_BatchKeepsNodeErrorsAndHidesTransportDetails(t *testing.T) {
 func TestUpstream_BatchWithUnsupportedChainFailsBeforeAnyNodeCall(t *testing.T) {
 	evm, hits := startNode(t, false, func(string) fakeReply { return fakeReply{result: `"0x1"`} })
 	handler := newUpstreamHandler(t, evm.URL, "")
+	handler.apiConfig.RPCMethodAllowlist = []string{"eth_blockNumber", "getSlot"}
 
 	body := `{"` + testEVMChain + `":[{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}],
 		"solanaish":[{"jsonrpc":"2.0","method":"getSlot","params":[],"id":1}]}`

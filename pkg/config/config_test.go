@@ -56,12 +56,41 @@ func TestLoadConfig_BitcoinRPCURL(t *testing.T) {
 	assert.Equal(t, "http://user:pass@127.0.0.1:8332", LoadConfig().Chains.BitcoinRPCURL)
 }
 
-func TestLoadConfig_MarketFetcherFlag(t *testing.T) {
-	t.Setenv("MARKET_FETCHER_ENABLED", "")
-	assert.True(t, LoadConfig().CoinGecko.FetcherEnabled)
+func TestLoadConfig_OptionalServices(t *testing.T) {
+	tests := []struct {
+		name            string
+		databaseEnabled string
+		fetcherEnabled  string
+		wantDatabase    bool
+		wantFetcher     bool
+		wantError       bool
+	}{
+		{name: "defaults disable optional services"},
+		{name: "explicitly disabled", databaseEnabled: "false", fetcherEnabled: "false"},
+		{name: "database serves stored data", databaseEnabled: "true", wantDatabase: true},
+		{name: "database and fetcher enabled", databaseEnabled: "true", fetcherEnabled: "true", wantDatabase: true, wantFetcher: true},
+		{name: "fetcher requires database", databaseEnabled: "false", fetcherEnabled: "true", wantFetcher: true, wantError: true},
+		{name: "fetcher requires explicit database opt in", fetcherEnabled: "true", wantFetcher: true, wantError: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("DATABASE_ENABLED", tt.databaseEnabled)
+			t.Setenv("MARKET_FETCHER_ENABLED", tt.fetcherEnabled)
+			t.Setenv("REQUEST_TIMEOUT", "")
+			t.Setenv("API_KEY", "")
+			t.Setenv("RPC_METHOD_ALLOWLIST", "")
 
-	t.Setenv("MARKET_FETCHER_ENABLED", "false")
-	assert.False(t, LoadConfig().CoinGecko.FetcherEnabled)
+			cfg := LoadConfig()
+			assert.Equal(t, tt.wantDatabase, cfg.Database.Enabled)
+			assert.Equal(t, tt.wantFetcher, cfg.CoinGecko.FetcherEnabled)
+			err := cfg.Validate()
+			if tt.wantError {
+				assert.ErrorContains(t, err, "MARKET_FETCHER_ENABLED requires DATABASE_ENABLED=true")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestNewAPIConfigFromServer(t *testing.T) {

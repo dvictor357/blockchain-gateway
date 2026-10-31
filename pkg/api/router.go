@@ -34,7 +34,7 @@ func NewRouter(handler *Handler, logger *log.Logger, serverConfig config.ServerC
 	register(root, "", http.MethodGet, "/swagger", func(c *blaze.Context) error {
 		return c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
 	})
-	register(root, "", http.MethodGet, "/swagger/*any", swaggerHandler(logger))
+	register(root, "", http.MethodGet, "/swagger/{any...}", swaggerHandler(logger))
 
 	apiV1 := engine.Group("/api/v1")
 	for _, route := range []struct {
@@ -43,13 +43,13 @@ func NewRouter(handler *Handler, logger *log.Logger, serverConfig config.ServerC
 		handler blaze.HandlerFunc
 	}{
 		{http.MethodGet, "/chains", handler.ListChains},
-		{http.MethodPost, "/chains/:chain/query", handler.QueryChain},
+		{http.MethodPost, "/chains/{chain}/query", handler.QueryChain},
 		{http.MethodPost, "/batch", handler.BatchQuery},
-		{http.MethodGet, "/chains/:chain/address/:address/balance", handler.GetBalance},
-		{http.MethodGet, "/chains/:chain/block/latest", handler.GetLatestBlock},
-		{http.MethodGet, "/chains/:chain/tx/:hash", handler.GetTransaction},
-		{http.MethodGet, "/chains/:chain/gas-price", handler.GetGasPrice},
-		{http.MethodGet, "/chains/:chain/address/:address/nonce", handler.GetTransactionCount},
+		{http.MethodGet, "/chains/{chain}/address/{address}/balance", handler.GetBalance},
+		{http.MethodGet, "/chains/{chain}/block/latest", handler.GetLatestBlock},
+		{http.MethodGet, "/chains/{chain}/tx/{hash}", handler.GetTransaction},
+		{http.MethodGet, "/chains/{chain}/gas-price", handler.GetGasPrice},
+		{http.MethodGet, "/chains/{chain}/address/{address}/nonce", handler.GetTransactionCount},
 		{http.MethodGet, "/markets", handler.GetCoinMarkets},
 	} {
 		register(apiV1, "/api/v1", route.method, route.path, route.handler)
@@ -69,10 +69,10 @@ func NewRouter(handler *Handler, logger *log.Logger, serverConfig config.ServerC
 
 	// Blaze applies Engine.Use only to matched routes. Keep the shared middleware
 	// at the HTTP boundary so unknown paths and methods are logged and limited too.
-	serve := LoggingMiddleware(logger)(blaze.Recovery()(RateLimit(serverConfig.RateLimit)(func(c *blaze.Context) error {
+	serve := LoggingMiddleware(logger)(blaze.Recovery()(RateLimit(serverConfig.RateLimit)(APIKeyAuth(serverConfig.APIKey)(func(c *blaze.Context) error {
 		engine.ServeHTTP(c.ResponseWriter, c.Request)
 		return nil
-	})))
+	}))))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := serve(&blaze.Context{ResponseWriter: w, Request: r}); err != nil {
 			logger.Printf("Failed to write HTTP response: %v", err)

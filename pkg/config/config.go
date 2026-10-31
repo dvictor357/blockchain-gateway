@@ -37,6 +37,7 @@ const (
 
 // ServerConfig holds server-specific configurations
 type ServerConfig struct {
+	SecurityConfig
 	Port      string
 	Host      string
 	Mode      string
@@ -48,6 +49,8 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database connection parameters
 type DatabaseConfig struct {
+	// Enabled opts into database-backed market data (DATABASE_ENABLED).
+	Enabled  bool
 	Host     string
 	Port     string
 	User     string
@@ -103,14 +106,16 @@ type AppConfig struct {
 func LoadConfig() *AppConfig {
 	cfg := &AppConfig{
 		Server: ServerConfig{
-			Port:      GetStringEnv("PORT", defaultPort),
-			Host:      defaultHost,
-			Mode:      GetStringEnv("APP_MODE", defaultAppMode),
-			RateLimit: GetIntEnv("RATE_LIMIT", 120),
+			SecurityConfig: LoadSecurityConfig(),
+			Port:           GetStringEnv("PORT", defaultPort),
+			Host:           defaultHost,
+			Mode:           GetStringEnv("APP_MODE", defaultAppMode),
+			RateLimit:      GetIntEnv("RATE_LIMIT", 120),
 
 			RequestTimeout: loadRequestTimeout(),
 		},
 		Database: DatabaseConfig{
+			Enabled:  GetBoolEnv("DATABASE_ENABLED", false),
 			Host:     GetStringEnv("DB_HOST", defaultDBHost),
 			Port:     GetStringEnv("DB_PORT", defaultDBPort),
 			User:     GetStringEnv("DB_USER", defaultDBUser),
@@ -124,7 +129,7 @@ func LoadConfig() *AppConfig {
 			Order:      GetStringEnv("COINGECKO_ORDER", defaultCoinGeckoOrder),
 			VsCurrency: GetStringEnv("COINGECKO_VS_CURRENCY", defaultCoinGeckoVsCurrency),
 
-			FetcherEnabled: GetBoolEnv("MARKET_FETCHER_ENABLED", true),
+			FetcherEnabled: GetBoolEnv("MARKET_FETCHER_ENABLED", false),
 		},
 		Chains:        LoadChainsConfig(),
 		LogLevel:      GetStringEnv("LOG_LEVEL", defaultLogLevel),
@@ -139,6 +144,12 @@ func (c *AppConfig) Validate() error {
 		c.Server.RequestTimeout > maxRequestTimeoutSeconds*time.Second {
 		return fmt.Errorf("REQUEST_TIMEOUT must be a whole number of seconds between %d and %d",
 			minRequestTimeoutSeconds, maxRequestTimeoutSeconds)
+	}
+	if err := c.Server.SecurityConfig.Validate(); err != nil {
+		return err
+	}
+	if c.CoinGecko.FetcherEnabled && !c.Database.Enabled {
+		return fmt.Errorf("MARKET_FETCHER_ENABLED requires DATABASE_ENABLED=true")
 	}
 	return nil
 }

@@ -97,7 +97,7 @@ func TestHandler_RequestBodyLimit(t *testing.T) {
 					Return(json.RawMessage(`"0x1"`), nil).Once()
 			}
 
-			w := serveBody("/chains/:chain/query", "/chains/ethereum/query",
+			w := serveBody("/chains/{chain}/query", "/chains/ethereum/query",
 				strings.NewReader(tt.body), tt.contentLength, handler.QueryChain)
 
 			assert.Equal(t, tt.wantStatus, w.Code)
