@@ -25,7 +25,12 @@ const docTemplate = `{
     "paths": {
         "/api/v1/batch": {
             "post": {
-                "description": "Execute multiple RPC queries across different blockchain networks in a single request.\nThe total number of RPC requests across all chains is limited (10 by default); requests on one chain run sequentially.\nPer-request node errors are returned inside the response with their original code and data.",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Execute multiple RPC queries across different blockchain networks in a single request.\nThe total number of RPC requests across all chains is limited (10 by default); requests on one chain run sequentially.\nPer-request node errors are returned inside the response with their original code and data.\nAll methods are checked against RPC_METHOD_ALLOWLIST before any upstream call; one denied method rejects the entire batch with 403 RPC_METHOD_NOT_ALLOWED.",
                 "consumes": [
                     "application/json"
                 ],
@@ -72,6 +77,18 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -95,6 +112,11 @@ const docTemplate = `{
         },
         "/api/v1/chains": {
             "get": {
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
                 "description": "Get a list of all blockchain networks supported by this gateway",
                 "consumes": [
                     "application/json"
@@ -113,6 +135,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.ChainsResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -124,7 +152,12 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/address/{address}/balance": {
             "get": {
-                "description": "Get the native token balance for a specific address on a blockchain.\nBitcoin is not supported (HTTP 501, code OPERATION_NOT_SUPPORTED): no address index is configured.",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Get the native token balance for a specific address on a blockchain.\nBitcoin is not supported (HTTP 501, code OPERATION_NOT_SUPPORTED): no address index is configured.\nHelper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.",
                 "consumes": [
                     "application/json"
                 ],
@@ -140,7 +173,13 @@ const docTemplate = `{
                         "enum": [
                             "ethereum",
                             "bitcoin",
-                            "polygon"
+                            "polygon",
+                            "bsc",
+                            "arbitrum",
+                            "optimism",
+                            "base",
+                            "avalanche",
+                            "fantom"
                         ],
                         "type": "string",
                         "description": "Blockchain name",
@@ -165,6 +204,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -204,7 +255,12 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/address/{address}/nonce": {
             "get": {
-                "description": "Get the number of transactions for a specific address on a blockchain",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Get the number of transactions for a specific address on a blockchain\nHelper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.",
                 "consumes": [
                     "application/json"
                 ],
@@ -220,7 +276,13 @@ const docTemplate = `{
                         "enum": [
                             "ethereum",
                             "bitcoin",
-                            "polygon"
+                            "polygon",
+                            "bsc",
+                            "arbitrum",
+                            "optimism",
+                            "base",
+                            "avalanche",
+                            "fantom"
                         ],
                         "type": "string",
                         "description": "Blockchain name",
@@ -245,6 +307,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -278,7 +352,12 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/block/latest": {
             "get": {
-                "description": "Get information about the latest block on a blockchain",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Get information about the latest block on a blockchain\nHelper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.",
                 "consumes": [
                     "application/json"
                 ],
@@ -294,7 +373,13 @@ const docTemplate = `{
                         "enum": [
                             "ethereum",
                             "bitcoin",
-                            "polygon"
+                            "polygon",
+                            "bsc",
+                            "arbitrum",
+                            "optimism",
+                            "base",
+                            "avalanche",
+                            "fantom"
                         ],
                         "type": "string",
                         "description": "Blockchain name",
@@ -312,6 +397,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -345,7 +442,12 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/gas-price": {
             "get": {
-                "description": "Get the current gas price for EVM-compatible blockchains",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Get the current gas price for EVM-compatible blockchains\nHelper RPC dependencies must all be permitted by RPC_METHOD_ALLOWLIST.",
                 "consumes": [
                     "application/json"
                 ],
@@ -360,7 +462,14 @@ const docTemplate = `{
                     {
                         "enum": [
                             "ethereum",
-                            "polygon"
+                            "bitcoin",
+                            "polygon",
+                            "bsc",
+                            "arbitrum",
+                            "optimism",
+                            "base",
+                            "avalanche",
+                            "fantom"
                         ],
                         "type": "string",
                         "description": "Blockchain name",
@@ -378,6 +487,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -411,7 +532,12 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/query": {
             "post": {
-                "description": "Execute a JSON-RPC query on a specific blockchain network",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Execute a JSON-RPC query on a specific blockchain network\nOnly exact methods in RPC_METHOD_ALLOWLIST are exposed; defaults are finite read-only methods. Denied methods return 403 RPC_METHOD_NOT_ALLOWED.",
                 "consumes": [
                     "application/json"
                 ],
@@ -427,7 +553,13 @@ const docTemplate = `{
                         "enum": [
                             "ethereum",
                             "bitcoin",
-                            "polygon"
+                            "polygon",
+                            "bsc",
+                            "arbitrum",
+                            "optimism",
+                            "base",
+                            "avalanche",
+                            "fantom"
                         ],
                         "type": "string",
                         "description": "Blockchain name",
@@ -454,6 +586,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -493,7 +637,12 @@ const docTemplate = `{
         },
         "/api/v1/chains/{chain}/tx/{hash}": {
             "get": {
-                "description": "Get detailed information about a specific transaction by its hash",
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
+                "description": "Get detailed information about a specific transaction by its hash\nAll helper RPC dependencies, including optional receipt/block enrichment, must be permitted by RPC_METHOD_ALLOWLIST.",
                 "consumes": [
                     "application/json"
                 ],
@@ -509,7 +658,13 @@ const docTemplate = `{
                         "enum": [
                             "ethereum",
                             "bitcoin",
-                            "polygon"
+                            "polygon",
+                            "bsc",
+                            "arbitrum",
+                            "optimism",
+                            "base",
+                            "avalanche",
+                            "fantom"
                         ],
                         "type": "string",
                         "description": "Blockchain name",
@@ -534,6 +689,18 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -567,6 +734,11 @@ const docTemplate = `{
         },
         "/api/v1/markets": {
             "get": {
+                "security": [
+                    {
+                        "APIKeyAuth": []
+                    }
+                ],
                 "description": "Get a list of cryptocurrency markets with pagination and sorting",
                 "consumes": [
                     "application/json"
@@ -632,8 +804,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/api.SwaggerErrorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/api.SwaggerErrorResponse"
                         }
@@ -1082,30 +1266,23 @@ const docTemplate = `{
             }
         }
     },
-    "tags": [
-        {
-            "description": "Health check operations",
-            "name": "health"
-        },
-        {
-            "description": "Blockchain operations and queries",
-            "name": "chains"
-        },
-        {
-            "description": "Cryptocurrency market data operations",
-            "name": "markets"
+    "securityDefinitions": {
+        "APIKeyAuth": {
+            "type": "apiKey",
+            "name": "X-API-Key",
+            "in": "header"
         }
-    ]
+    }
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "0.1.0",
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
 	Title:            "Blockchain Gateway API",
-	Description:      "A high-performance Go API gateway for interacting with multiple blockchain networks through a unified interface.\n\nThis API provides simplified access to various blockchain RPC endpoints through a single, consistent interface.\nIt abstracts away the differences between blockchain implementations, allowing developers to focus on building their applications.",
+	Description:      "A tiny read-only Go chain API with a unified interface for blockchain RPC queries and optional stored market data.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

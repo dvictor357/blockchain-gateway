@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Invocations (each starts PostgreSQL and waits for it to be healthy):
 #   docker-compose up blockchain-gateway-dev        # hot-reload development service
 #   docker-compose up blockchain-gateway-prod       # production-like service on :8081
@@ -51,6 +49,7 @@ services:
     environment:
       - APP_MODE=debug
       - PORT=8080
+      - DATABASE_ENABLED=true
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER:-gateway}
@@ -61,7 +60,7 @@ services:
       - BTC_RPC_URL=https://btc.getblock.io/mainnet
       - LOG_LEVEL=debug
       - REQUEST_TIMEOUT=30
-      - MARKET_FETCHER_ENABLED=${MARKET_FETCHER_ENABLED:-true}
+      - MARKET_FETCHER_ENABLED=${MARKET_FETCHER_ENABLED:-false}
     networks:
       - blockchain-network
     restart: unless-stopped
@@ -81,6 +80,7 @@ services:
     environment:
       - APP_MODE=release
       - PORT=8080
+      - DATABASE_ENABLED=true
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER:-gateway}
@@ -91,7 +91,7 @@ services:
       - BTC_RPC_URL=https://btc.getblock.io/mainnet
       - LOG_LEVEL=info
       - REQUEST_TIMEOUT=30
-      - MARKET_FETCHER_ENABLED=${MARKET_FETCHER_ENABLED:-true}
+      - MARKET_FETCHER_ENABLED=${MARKET_FETCHER_ENABLED:-false}
     networks:
       - blockchain-network
     restart: unless-stopped

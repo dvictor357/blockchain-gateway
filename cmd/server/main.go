@@ -1,9 +1,6 @@
 // @title           Blockchain Gateway API
-// @version         1.0
-// @description     A high-performance Go API gateway for interacting with multiple blockchain networks through a unified interface.
-// @description
-// @description     This API provides simplified access to various blockchain RPC endpoints through a single, consistent interface.
-// @description     It abstracts away the differences between blockchain implementations, allowing developers to focus on building their applications.
+// @version         0.1.0
+// @description     A tiny read-only Go chain API with a unified interface for blockchain RPC queries and optional stored market data.
 //
 // @contact.name   API Support
 // @contact.url    https://github.com/dvictor357/blockchain-gateway
@@ -16,6 +13,10 @@
 // @BasePath  /
 //
 // @schemes   http https
+//
+// @securityDefinitions.apikey APIKeyAuth
+// @in header
+// @name X-API-Key
 //
 // @tag.name health
 // @tag.description Health check operations
@@ -88,47 +89,53 @@ func run(logger *log.Logger) error {
 	`
 	logger.Println(startupMessage)
 
-	dbConnectionCfg := database.DBConfig{
-		Host:     appConfig.Database.Host,
-		Port:     appConfig.Database.Port,
-		User:     appConfig.Database.User,
-		Password: appConfig.Database.Password,
-		DBName:   appConfig.Database.DBName,
-		SSLMode:  appConfig.Database.SSLMode,
-	}
+	var marketServ *marketdata.Service
+	var marketAPIService api.MarketDataService
+	if appConfig.Database.Enabled {
+		dbConnectionCfg := database.DBConfig{
+			Host:     appConfig.Database.Host,
+			Port:     appConfig.Database.Port,
+			User:     appConfig.Database.User,
+			Password: appConfig.Database.Password,
+			DBName:   appConfig.Database.DBName,
+			SSLMode:  appConfig.Database.SSLMode,
+		}
 
-	db, err := database.ConnectDB(context.Background(), dbConnectionCfg)
-	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-	// Deferred first so it runs last: the market worker is stopped before the database closes.
-	defer db.Close()
+		db, err := database.ConnectDB(context.Background(), dbConnectionCfg)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		// Deferred first so it runs last: the market worker is stopped before the database closes.
+		defer db.Close()
 
-	migrationCtx, cancelMigration := context.WithTimeout(context.Background(), migrationTimeout)
-	err = database.RunMigrations(migrationCtx, db, appConfig.MigrationsDir)
-	cancelMigration()
-	if err != nil {
-		return fmt.Errorf("failed to run database migrations: %w", err)
+		migrationCtx, cancelMigration := context.WithTimeout(context.Background(), migrationTimeout)
+		err = database.RunMigrations(migrationCtx, db, appConfig.MigrationsDir)
+		cancelMigration()
+		if err != nil {
+			return fmt.Errorf("failed to run database migrations: %w", err)
+		}
+		logger.Println("Database migrations completed successfully.")
+
+		cgClient := coingecko.NewClient(nil, appConfig.CoinGecko.BaseURL)
+		marketRepo := marketdata.NewPostgresMarketRepository(db)
+		marketServiceConfig := marketdata.ServiceConfig{
+			CoinGeckoVsCurrency:      appConfig.CoinGecko.VsCurrency,
+			CoinGeckoOrder:           appConfig.CoinGecko.Order,
+			CoinGeckoPerPage:         appConfig.CoinGecko.PerPage,
+			CoinGeckoPage:            1,
+			CoinGeckoSparkline:       false,
+			CoinGeckoPriceChangePerc: []string{"24h"},
+		}
+		marketServ = marketdata.NewService(logger, cgClient, marketRepo, marketServiceConfig)
+		marketAPIService = marketServ
+	} else {
+		logger.Println("Database disabled (DATABASE_ENABLED=false); market data API unavailable.")
 	}
-	logger.Println("Database migrations completed successfully.")
 
 	clientManager, err := blockchain.NewClientManager(appConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize blockchain client manager: %w", err)
 	}
-
-	cgClient := coingecko.NewClient(nil, appConfig.CoinGecko.BaseURL)
-	marketRepo := marketdata.NewPostgresMarketRepository(db)
-
-	marketServiceConfig := marketdata.ServiceConfig{
-		CoinGeckoVsCurrency:      appConfig.CoinGecko.VsCurrency,
-		CoinGeckoOrder:           appConfig.CoinGecko.Order,
-		CoinGeckoPerPage:         appConfig.CoinGecko.PerPage,
-		CoinGeckoPage:            1,
-		CoinGeckoSparkline:       false,
-		CoinGeckoPriceChangePerc: []string{"24h"},
-	}
-	marketServ := marketdata.NewService(logger, cgClient, marketRepo, marketServiceConfig)
 
 	// The worker stops on every exit path, and its loop is awaited before the database closes.
 	workerCtx, cancelWorker := context.WithCancel(context.Background())
@@ -139,7 +146,9 @@ func run(logger *log.Logger) error {
 			marketServ.StartFetchingLoop(workerCtx)
 		}()
 	} else {
-		logger.Println("Market data fetcher disabled (MARKET_FETCHER_ENABLED=false); serving stored data only.")
+		if appConfig.Database.Enabled {
+			logger.Println("Market data fetcher disabled (MARKET_FETCHER_ENABLED=false); serving stored data only.")
+		}
 		close(workerDone)
 	}
 	defer func() {
@@ -148,7 +157,7 @@ func run(logger *log.Logger) error {
 	}()
 
 	apiConfig := config.NewAPIConfigFromServer(appConfig.Server)
-	apiHandler := api.NewHandler(clientManager, logger, marketServ, apiConfig)
+	apiHandler := api.NewHandler(clientManager, logger, marketAPIService, apiConfig)
 
 	router := api.NewRouter(apiHandler, logger, appConfig.Server)
 
